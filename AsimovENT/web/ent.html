@@ -1,0 +1,2575 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Collège Asimov — Espace Numérique de Travail</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <style>
+    /* ═══ ONGLETS AUTH ═══ */
+    .auth-tabs {
+      display: flex;
+      gap: 4px;
+      background: #F1F5F9;
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 22px;
+    }
+
+    .auth-tab {
+      flex: 1;
+      padding: 9px;
+      border-radius: 7px;
+      border: none;
+      font-family: 'Sora', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748B;
+      background: transparent;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .auth-tab.active {
+      background: #fff;
+      color: #1E3A8A;
+      box-shadow: 0 1px 6px rgba(0, 0, 0, .1);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* ═══ JAUGE MOT DE PASSE ═══ */
+    .pwd-strength {
+      height: 4px;
+      background: #E2E8F0;
+      border-radius: 4px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .pwd-bar {
+      height: 100%;
+      width: 0%;
+      border-radius: 4px;
+      transition: width .3s, background .3s;
+    }
+
+    /* ═══ BADGE FORMAT ═══ */
+    .format-badge {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      font-size: 12px;
+      color: #1E40AF;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      line-height: 1.6;
+    }
+
+    .format-badge strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 13px;
+    }
+
+    .format-example {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: #DBEAFE;
+      padding: 2px 8px;
+      border-radius: 5px;
+      color: #1D4ED8;
+      display: inline-block;
+      margin-top: 4px;
+    }
+
+    /* ═══ ALERTE SUCCÈS DEMANDE ═══ */
+    .demande-success {
+      background: #D1FAE5;
+      border: 1px solid #6EE7B7;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      color: #065F46;
+    }
+
+    .demande-success svg {
+      display: block;
+      margin: 0 auto 10px;
+    }
+
+    .demande-success h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .demande-success p {
+      font-size: 13px;
+      opacity: .85;
+      line-height: 1.6;
+    }
+
+    /* ═══ PAGE PRINCIPAL ═══ */
+    #page-principal {
+      background: #F8FAFC;
+      width: 100%;
+      flex-direction: column;
+    }
+
+    .principal-layout {
+      display: flex;
+      min-height: 100vh;
+      width: 100%;
+      flex: 1;
+    }
+
+    .sidebar-principal {
+      width: 240px;
+      min-width: 240px;
+      background: linear-gradient(160deg, #0C1E4A, #1E3A8A);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0;
+      flex-shrink: 0;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+    }
+
+    /* ═══ DEMANDES CARDS ═══ */
+    .demandes-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .demande-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 18px 20px;
+      border: 1px solid #E2E8F0;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .05);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: box-shadow .2s;
+    }
+
+    .demande-card:hover {
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .1);
+    }
+
+    .demande-avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, #1E3A8A, #3B82F6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .demande-info {
+      flex: 1;
+    }
+
+    .demande-nom {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0F172A;
+    }
+
+    .demande-meta {
+      font-size: 12px;
+      color: #64748B;
+      margin-top: 3px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .demande-meta span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .demande-date {
+      font-size: 11px;
+      color: #94A3B8;
+      margin-top: 5px;
+    }
+
+    .demande-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .btn-approuver {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, #059669, #10B981);
+      color: #fff;
+      font-family: 'Sora', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all .2s;
+    }
+
+    .btn-approuver:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, .35);
+    }
+
+    .btn-refuser {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1.5px solid #FCA5A5;
+      cursor: pointer;
+      background: #FEF2F2;
+      color: #DC2626;
+      font-family: 'Sora', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all .2s;
+    }
+
+    .btn-refuser:hover {
+      background: #FEE2E2;
+    }
+
+    .badge-attente {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #FEF3C7;
+      color: #92400E;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-approuve {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #D1FAE5;
+      color: #065F46;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-refuse {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #FEE2E2;
+      color: #991B1B;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .empty-demandes {
+      text-align: center;
+      padding: 60px 20px;
+      color: #94A3B8;
+    }
+
+    .empty-demandes svg {
+      margin: 0 auto 16px;
+      opacity: .4;
+      display: block;
+    }
+
+    .empty-demandes p {
+      font-size: 14px;
+    }
+
+    /* ═══ TOAST NOTIFICATION ═══ */
+    .toast-success {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      background: #065F46;
+      color: #fff;
+      padding: 14px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-family: 'Sora', sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .3);
+      animation: slideInRight .3s ease;
+    }
+
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(30px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* ═══ STAT CARDS PRINCIPAL ═══ */
+    .principal-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .pstat-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #E2E8F0;
+      text-align: center;
+    }
+
+    .pstat-value {
+      font-size: 32px;
+      font-weight: 800;
+      color: #1E3A8A;
+    }
+
+    .pstat-label {
+      font-size: 12px;
+      color: #64748B;
+      margin-top: 4px;
+    }
+
+    .pstat-orange .pstat-value {
+      color: #D97706;
+    }
+
+    .pstat-green .pstat-value {
+      color: #059669;
+    }
+
+    /* ═══ TABS HISTORIQUE ═══ */
+    .history-tabs {
+      display: flex;
+      gap: 4px;
+      background: #F1F5F9;
+      border-radius: 8px;
+      padding: 3px;
+      margin-bottom: 20px;
+    }
+
+    .history-tab {
+      flex: 1;
+      padding: 7px;
+      border-radius: 6px;
+      border: none;
+      font-family: 'Sora', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748B;
+      background: transparent;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .history-tab.active {
+      background: #fff;
+      color: #1E3A8A;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .08);
+    }
+
+    /* ═══ PAGE ADMIN (CPE / SECRÉTAIRE) ═══ */
+    .sidebar-admin {
+      background: linear-gradient(160deg, #1E1B4B, #4338CA);
+    }
+
+    .sidebar-cpe {
+      background: linear-gradient(160deg, #14532D, #16A34A);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════
+     PAGE 1 : CONNEXION
+════════════════════════════════════════════════ -->
+  <div id="page-login" class="page active">
+
+    <div class="login-bg">
+      <div class="login-bg-grid"></div>
+      <div class="login-bg-orb orb1"></div>
+      <div class="login-bg-orb orb2"></div>
+    </div>
+
+    <div class="login-wrapper">
+
+      <!-- HEADER -->
+      <header class="login-header">
+        <div class="school-badge">
+          <div class="school-icon">
+            <svg viewBox="0 0 48 48" fill="none">
+              <path d="M24 4L44 14V22C44 32.5 35.5 42 24 44C12.5 42 4 32.5 4 22V14L24 4Z" stroke="currentColor"
+                stroke-width="2.5" fill="none" />
+              <path d="M16 24H32M24 16V32" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+            </svg>
+          </div>
+          <div class="school-info">
+            <span class="school-name">Collège Asimov</span>
+            <span class="school-subtitle">Espace Numérique de Travail</span>
+          </div>
+        </div>
+        <div class="header-badges">
+          <span class="badge badge-edu">Éducation Nationale</span>
+          <span class="badge badge-year">2024 – 2025</span>
+        </div>
+      </header>
+
+      <!-- FORMULAIRE -->
+      <main class="login-main">
+        <div class="login-card">
+
+          <!-- ONGLETS CONNEXION / DEMANDE -->
+          <div class="auth-tabs">
+            <button class="auth-tab active" onclick="switchAuthTab('login')">🔑 Connexion</button>
+            <button class="auth-tab" onclick="switchAuthTab('demande')">📋 Demander un compte</button>
+          </div>
+
+          <!-- ══ FORMULAIRE CONNEXION ══ -->
+          <div id="form-login">
+            <div class="login-card-header">
+              <h1>Connexion</h1>
+              <p>Accédez à votre espace personnel sécurisé</p>
+            </div>
+
+            <!-- Onglets de rôle -->
+            <div class="role-tabs">
+              <button class="role-tab active" data-role="eleve" onclick="switchRole('eleve')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 14l9-5-9-5-9 5 9 5z" />
+                </svg>
+                Élève
+              </button>
+              <button class="role-tab" data-role="parent" onclick="switchRole('parent')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 00-3-3.87" />
+                  <path d="M16 3.13a4 4 0 010 7.75" />
+                </svg>
+                Parent
+              </button>
+              <button class="role-tab" data-role="professeur" onclick="switchRole('professeur')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                </svg>
+                Professeur
+              </button>
+              <button class="role-tab" data-role="administratif" onclick="switchRole('administratif')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                </svg>
+                Direction
+              </button>
+            </div>
+
+            <form class="login-form" onsubmit="handleLogin(event)">
+              <div class="form-group">
+                <label for="username">Identifiant</label>
+                <div class="input-wrapper">
+                  <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  <input type="text" id="username" placeholder="Votre identifiant ENT" autocomplete="off" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="password">Mot de passe</label>
+                <div class="input-wrapper">
+                  <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                    <path d="M7 11V7a5 5 0 0110 0v4" />
+                  </svg>
+                  <input type="password" id="password" placeholder="••••••••" />
+                  <button type="button" class="pwd-toggle" onclick="togglePassword()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div id="login-error" class="login-error hidden">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span id="login-error-msg">Identifiant ou mot de passe incorrect.</span>
+              </div>
+
+              <button type="submit" class="btn-login">
+                <span>Se connecter</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              <div class="login-help">
+                <a href="#" onclick="switchAuthTab('demande')">Première fois ? Faire une demande de compte →</a>
+              </div>
+            </form>
+
+
+          </div>
+
+          <!-- ══ FORMULAIRE DEMANDE DE COMPTE ══ -->
+          <div id="form-demande" class="hidden">
+            <div class="login-card-header">
+              <h1>Demander un compte</h1>
+              <p>Vérification de votre inscription au collège</p>
+            </div>
+
+            <!-- Format d'identifiant -->
+            <div class="format-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"
+                style="flex-shrink:0;margin-top:2px">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <div>
+                <strong>Format de l'identifiant :</strong>
+                nom.prenom.JJMMAAAA (date de naissance)
+                <br>
+                <span class="format-example">ex : lefebvre.martin.12032011</span>
+              </div>
+            </div>
+
+            <div id="demande-form-content">
+              <form class="login-form" onsubmit="handleDemande(event)">
+                <div class="form-group">
+                  <label for="dem-identifiant">Identifiant ENT</label>
+                  <div class="input-wrapper">
+                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    <input type="text" id="dem-identifiant" placeholder="nom.prenom.JJMMAAAA" autocomplete="off"
+                      oninput="this.value=this.value.toLowerCase()" />
+                  </div>
+                  <small id="dem-hint" style="font-size:11px;color:#64748B;margin-top:3px;display:block"></small>
+                </div>
+
+                <div class="form-group">
+                  <label for="dem-password">Choisissez un mot de passe</label>
+                  <div class="input-wrapper">
+                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" />
+                      <path d="M7 11V7a5 5 0 0110 0v4" />
+                    </svg>
+                    <input type="password" id="dem-password" placeholder="Minimum 6 caractères"
+                      oninput="checkPwdStrength(this.value)" />
+                  </div>
+                  <div class="pwd-strength">
+                    <div class="pwd-bar" id="dem-pwd-bar"></div>
+                  </div>
+                  <small id="dem-pwd-label" style="font-size:11px;color:#64748B;margin-top:2px;display:block"></small>
+                </div>
+
+                <div class="form-group">
+                  <label for="dem-password2">Confirmer le mot de passe</label>
+                  <div class="input-wrapper">
+                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" />
+                      <path d="M7 11V7a5 5 0 0110 0v4" />
+                    </svg>
+                    <input type="password" id="dem-password2" placeholder="Répétez votre mot de passe" />
+                  </div>
+                </div>
+
+                <div id="demande-error" class="login-error hidden">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span id="demande-error-msg">Erreur</span>
+                </div>
+
+                <button type="submit" class="btn-login" style="background:linear-gradient(135deg,#1E3A8A,#3B82F6)">
+                  <span>Envoyer la demande</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13" />
+                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                  </svg>
+                </button>
+              </form>
+            </div>
+
+            <!-- Succès de la demande -->
+            <div id="demande-success-box" class="hidden" style="margin-top:16px">
+              <div class="demande-success">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="40"
+                  style="color:#059669">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <h3 id="demande-success-titre">Demande envoyée !</h3>
+                <p id="demande-success-msg">Votre demande a été transmise au directeur.<br>Une fois validée, vous
+                  pourrez vous connecter.</p>
+              </div>
+            </div>
+
+            <div style="margin-top:16px;text-align:center">
+              <a href="#" onclick="switchAuthTab('login')" style="font-size:13px;color:#3B82F6;text-decoration:none">←
+                Retour à la connexion</a>
+            </div>
+          </div>
+
+        </div>
+      </main>
+
+      <footer class="login-footer">
+        <span>© 2025 Collège Asimov – Académie de Paris</span>
+        <span>•</span><a href="site-vitrine.html">Site du collège</a>
+        <span>•</span><a href="#">Contact</a>
+      </footer>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════
+     PAGE 2 : DASHBOARD ÉLÈVE
+════════════════════════════════════════════════ -->
+  <div id="page-eleve" class="page">
+    <aside class="sidebar sidebar-eleve">
+      <div class="sidebar-logo">
+        <div class="sidebar-icon">
+          <svg viewBox="0 0 48 48" fill="none">
+            <path d="M24 4L44 14V22C44 32.5 35.5 42 24 44C12.5 42 4 32.5 4 22V14L24 4Z" stroke="currentColor"
+              stroke-width="2.5" />
+            <path d="M16 24H32M24 16V32" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div><span class="sidebar-school">Asimov</span><span class="sidebar-role">Espace Élève</span></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" onclick="showSection('accueil', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+          </svg> Accueil
+        </a>
+        <a href="#" class="nav-item" onclick="showSection('emploi-du-temps', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg> Emploi du temps
+        </a>
+        <a href="#" class="nav-item" onclick="showSection('notes', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg> Notes & Bulletins
+        </a>
+        <a href="#" class="nav-item" onclick="showSection('progression', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg> Ma progression
+        </a>
+        <a href="#" class="nav-item" onclick="showSection('devoirs', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg> Devoirs
+        </a>
+        <a href="#" class="nav-item" onclick="showSection('messagerie', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22 6 12 13 2 6" />
+          </svg> Messagerie
+          <span class="nav-badge" id="eleve-msg-badge">2</span>
+        </a>
+        <a href="#" class="nav-item" onclick="showSection('absences', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+          </svg> Absences & Retards
+        </a>
+        <a href="#" class="nav-item" onclick="showSection('ressources', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+          </svg> Ressources
+        </a>
+        <a href="#" class="nav-item" onclick="showSection('vie-scolaire', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+          </svg> Vie scolaire
+        </a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-user">
+          <div class="user-avatar" id="eleve-avatar">ML</div>
+          <div class="user-info">
+            <span id="eleve-fullname" class="user-name">Martin Lefebvre</span>
+            <span id="eleve-class" class="user-role">4ème B</span>
+          </div>
+          <button class="btn-logout" onclick="logout()" title="Déconnexion">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </button>
+        </div>
+        <button class="btn-dark-mode" id="btn-dark-eleve" onclick="toggleDarkMode()"><span
+            class="dark-icon">🌙</span><span class="dark-label"> Mode sombre</span></button>
+      </div>
+    </aside>
+
+    <main class="dashboard-main">
+      <!-- SECTION ACCUEIL -->
+      <section id="section-accueil" class="dash-section active">
+        <div class="section-header">
+          <div>
+            <h2 id="eleve-welcome">Bonjour 👋</h2>
+            <p class="section-subtitle" id="today-date"></p>
+          </div>
+          <div class="header-actions">
+            <div class="notif-btn" onclick="toggleNotifs()" id="notif-btn-eleve">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
+              </svg>
+              <span class="notif-dot" id="notif-dot-eleve"></span>
+              <span class="notif-count" id="notif-count-eleve">4</span>
+            </div>
+            <div class="notif-panel hidden" id="notif-panel-eleve">
+              <div class="notif-panel-header"><span>Notifications</span><button onclick="clearAllNotifs('eleve')">Tout
+                  marquer lu</button></div>
+              <div class="notif-list" id="notif-list-eleve"></div>
+            </div>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card stat-blue">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              </svg></div>
+            <div class="stat-content"><span class="stat-value" id="eleve-moyenne">–</span><span
+                class="stat-label">Moyenne générale</span></div>
+          </div>
+          <div class="stat-card stat-green">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg></div>
+            <div class="stat-content"><span class="stat-value" id="eleve-devoirs-count">0</span><span
+                class="stat-label">Devoirs à rendre</span></div>
+          </div>
+          <div class="stat-card stat-orange">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+              </svg></div>
+            <div class="stat-content"><span class="stat-value" id="eleve-abs-count">0</span><span
+                class="stat-label">Absences</span></div>
+          </div>
+          <div class="stat-card stat-purple">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+              </svg></div>
+            <div class="stat-content"><span class="stat-value" id="eleve-msg-count">0</span><span
+                class="stat-label">Messages non lus</span></div>
+          </div>
+        </div>
+        <div class="dashboard-row">
+          <div class="card card-large">
+            <div class="card-header">
+              <h3>Emploi du temps — Aujourd'hui</h3><button class="card-link"
+                onclick="showSection('emploi-du-temps', null)">Voir tout →</button>
+            </div>
+            <div class="today-schedule" id="today-schedule"></div>
+          </div>
+          <div class="card card-medium">
+            <div class="card-header">
+              <h3>Prochains devoirs</h3><button class="card-link" onclick="showSection('devoirs', null)">Voir tout
+                →</button>
+            </div>
+            <div class="devoir-list" id="home-devoirs"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>Dernières notes</h3><button class="card-link" onclick="showSection('notes', null)">Voir tout →</button>
+          </div>
+          <div class="notes-recent" id="home-notes"></div>
+        </div>
+      </section>
+
+      <!-- SECTION EMPLOI DU TEMPS -->
+      <section id="section-emploi-du-temps" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Emploi du temps</h2>
+            <p class="section-subtitle" id="eleve-classe-label"></p>
+          </div>
+          <div class="week-nav">
+            <button class="week-btn" onclick="changeWeek(-1)">‹</button>
+            <span id="week-label" style="font-size:13px;color:#64748B;padding:0 10px"></span>
+            <button class="week-btn" onclick="changeWeek(1)">›</button>
+          </div>
+        </div>
+        <div class="timetable-container">
+          <div class="timetable" id="timetable"></div>
+        </div>
+      </section>
+
+      <!-- SECTION NOTES -->
+      <section id="section-notes" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Notes & Bulletins</h2>
+            <p class="section-subtitle" id="notes-periode-subtitle"></p>
+          </div>
+        </div>
+        <div class="notes-grid" id="notes-grid"></div>
+      </section>
+
+      <!-- SECTION PROGRESSION ÉLÈVE -->
+      <section id="section-progression" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Ma progression</h2>
+            <p class="section-subtitle" id="eleve-prog-subtitle"></p>
+          </div>
+        </div>
+        <div id="eleve-prog-container"></div>
+      </section>
+
+      <!-- SECTION DEVOIRS -->
+      <section id="section-devoirs" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Cahier de textes</h2>
+            <p class="section-subtitle">Travail à faire</p>
+          </div>
+        </div>
+        <div class="devoirs-container" id="devoirs-container"></div>
+      </section>
+
+      <!-- SECTION MESSAGERIE -->
+      <section id="section-messagerie" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Messagerie scolaire</h2>
+          </div><button class="btn-primary" onclick="openCompose()">+ Nouveau message</button>
+        </div>
+        <div class="mail-layout">
+          <div class="mail-list" id="mail-list"></div>
+          <div class="mail-view" id="mail-view">
+            <div class="mail-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                width="48">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22 6 12 13 2 6" />
+              </svg>
+              <p>Sélectionnez un message</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION ABSENCES -->
+      <section id="section-absences" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Absences & Retards</h2>
+          </div>
+        </div>
+        <div class="absences-container" id="absences-container"></div>
+      </section>
+
+      <!-- SECTION RESSOURCES -->
+      <section id="section-ressources" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Ressources numériques</h2>
+          </div><input type="text" class="ressources-search" placeholder="🔍 Rechercher..."
+            oninput="filterRessources(this.value)" />
+        </div>
+        <div class="ressources-cats" id="ressources-cats"></div>
+        <div class="ressources-grid" id="ressources-grid"></div>
+      </section>
+
+      <!-- SECTION VIE SCOLAIRE -->
+      <section id="section-vie-scolaire" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Vie scolaire</h2>
+          </div>
+        </div>
+        <div class="vie-scolaire-grid" id="vie-scolaire-grid"></div>
+      </section>
+    </main>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════
+     PAGE 3 : DASHBOARD PROFESSEUR
+════════════════════════════════════════════════ -->
+  <div id="page-prof" class="page">
+    <aside class="sidebar sidebar-prof">
+      <div class="sidebar-logo">
+        <div class="sidebar-icon"><svg viewBox="0 0 48 48" fill="none">
+            <path d="M24 4L44 14V22C44 32.5 35.5 42 24 44C12.5 42 4 32.5 4 22V14L24 4Z" stroke="currentColor"
+              stroke-width="2.5" />
+            <path d="M16 24H32M24 16V32" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+          </svg></div>
+        <div><span class="sidebar-school">Asimov</span><span class="sidebar-role">Espace Enseignant</span></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" onclick="showProfSection('prof-accueil', this)"><svg viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+          </svg> Tableau de bord</a>
+        <a href="#" class="nav-item" onclick="showProfSection('prof-planning', this)"><svg viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg> Mon planning</a>
+        <a href="#" class="nav-item" onclick="showProfSection('prof-appel', this)"><svg viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2">
+            <polyline points="9 11 12 14 22 4" />
+          </svg> Feuille d'appel</a>
+        <a href="#" class="nav-item" onclick="showProfSection('prof-notes', this)"><svg viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+          </svg> Saisie des notes</a>
+        <a href="#" class="nav-item" onclick="showProfSection('prof-progression', this)"><svg viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <polyline points="8 7 3 12 8 17" />
+            <polyline points="16 7 21 12 16 17" />
+          </svg> Progression annuelle</a>
+        <a href="#" class="nav-item" onclick="showProfSection('prof-messagerie', this)"><svg viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+          </svg> Messagerie <span class="nav-badge" id="prof-msg-nav-badge">1</span></a>
+        <a href="#" class="nav-item" onclick="showProfSection('prof-classes', this)"><svg viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+          </svg> Mes classes</a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-user">
+          <div class="user-avatar prof-avatar" id="prof-avatar">PD</div>
+          <div class="user-info"><span id="prof-fullname" class="user-name">Pierre Dupont</span><span id="prof-matiere"
+              class="user-role">Mathématiques</span></div>
+          <button class="btn-logout" onclick="logout()" title="Déconnexion"><svg viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg></button>
+        </div>
+        <button class="btn-dark-mode" id="btn-dark-prof" onclick="toggleDarkMode()"><span
+            class="dark-icon">🌙</span><span class="dark-label"> Mode sombre</span></button>
+      </div>
+    </aside>
+    <main class="dashboard-main dashboard-main-prof">
+      <section id="section-prof-accueil" class="dash-section active">
+        <div class="section-header">
+          <div>
+            <h2 id="prof-welcome">Bonjour</h2>
+            <p class="section-subtitle" id="prof-today-date"></p>
+          </div>
+          <div class="header-actions">
+            <div class="notif-btn" onclick="toggleProfNotifs()" id="notif-btn-prof"
+              title="Notifications & Journal d'activité">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
+              </svg>
+              <span class="notif-dot" id="notif-dot-prof" style="display:block"></span>
+              <span class="notif-count" id="notif-count-prof" style="display:flex">3</span>
+            </div>
+            <div class="notif-panel hidden" id="notif-panel-prof">
+              <div class="notif-panel-header"><span>Notifications</span><button onclick="clearAllProfNotifs()">Tout
+                  marquer lu</button></div>
+              <div class="notif-list" id="notif-list-prof"></div>
+            </div>
+          </div>
+        </div>
+        <div class="stats-grid stats-grid-prof">
+          <div class="stat-card stat-slate">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+              </svg></div>
+            <div class="stat-content"><span class="stat-value">87</span><span class="stat-label">Élèves suivis</span>
+            </div>
+          </div>
+          <div class="stat-card stat-slate">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+              </svg></div>
+            <div class="stat-content"><span class="stat-value">4</span><span class="stat-label">Cours aujourd'hui</span>
+            </div>
+          </div>
+          <div class="stat-card stat-slate">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              </svg></div>
+            <div class="stat-content"><span class="stat-value">12</span><span class="stat-label">Copies à
+                corriger</span></div>
+          </div>
+        </div>
+        <div class="dashboard-row">
+          <div class="card card-large">
+            <div class="card-header">
+              <h3>Planning du jour</h3>
+            </div>
+            <div id="prof-planning-today"></div>
+          </div>
+          <div class="card card-medium">
+            <div class="card-header">
+              <h3>Mes classes</h3>
+            </div>
+            <div id="prof-classes-home"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>Journal d'activité</h3><button class="card-link" onclick="voirDernieresNotes()">📝 Voir les notes
+              →</button>
+          </div>
+          <div class="activity-log" id="activity-log"></div>
+          <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="background:#EFF6FF;border-radius:10px;padding:14px;border:1px solid #BFDBFE">
+              <div
+                style="font-size:12px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+                📋 DS Programmés</div>
+              <div id="prof-ds-list" style="display:flex;flex-direction:column;gap:7px;font-size:12px"></div>
+            </div>
+            <div style="background:#FEF3C7;border-radius:10px;padding:14px;border:1px solid #FDE68A">
+              <div
+                style="font-size:12px;font-weight:700;color:#D97706;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+                ⏰ Rattrapages (absents)</div>
+              <div id="prof-rattrapages-list" style="display:flex;flex-direction:column;gap:7px;font-size:12px"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section id="section-prof-classes" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Mes classes</h2>
+          </div>
+        </div>
+        <div id="prof-classes-grid"></div>
+      </section>
+      <section id="section-prof-notes" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Saisie des notes</h2>
+            <p class="section-subtitle">Saisie et historique par classe</p>
+          </div>
+        </div>
+
+        <!-- Contrôles principaux -->
+        <div class="notes-saisie-container">
+          <div class="saisie-controls">
+            <select id="saisie-classe" class="select-pro" onchange="loadClasseNotes()">
+              <option value="">Sélectionner une classe</option>
+              <optgroup label="── 6ème">
+                <option value="6A">6ème A</option>
+                <option value="6B">6ème B</option>
+                <option value="6C">6ème C</option>
+                <option value="6D">6ème D</option>
+              </optgroup>
+              <optgroup label="── 5ème">
+                <option value="5A">5ème A</option>
+                <option value="5B">5ème B</option>
+                <option value="5C">5ème C</option>
+                <option value="5D">5ème D</option>
+              </optgroup>
+              <optgroup label="── 4ème">
+                <option value="4A">4ème A</option>
+                <option value="4B">4ème B</option>
+                <option value="4C">4ème C</option>
+                <option value="4D">4ème D</option>
+              </optgroup>
+              <optgroup label="── 3ème">
+                <option value="3A">3ème A</option>
+                <option value="3B">3ème B</option>
+                <option value="3C">3ème C</option>
+                <option value="3D">3ème D</option>
+              </optgroup>
+            </select>
+            <!-- Onglets Nouvelle saisie / Historique -->
+            <div style="display:flex;gap:4px;background:#F1F5F9;border-radius:8px;padding:3px;margin-left:8px">
+              <button class="notes-view-tab active" id="tab-nouvelle-saisie" onclick="switchNotesView('saisie')">✏️
+                Nouvelle saisie</button>
+              <button class="notes-view-tab" id="tab-historique" onclick="switchNotesView('historique')">📋 Historique
+                <span id="badge-histo"
+                  style="background:#6366F1;color:#fff;border-radius:10px;padding:0 6px;font-size:10px;font-weight:700;margin-left:3px;display:none">0</span></button>
+            </div>
+          </div>
+
+          <!-- Panneau nouvelle saisie -->
+          <div id="notes-panel-saisie">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+              <select id="saisie-eval" class="select-pro">
+                <option value="">Type d'évaluation</option>
+                <option value="DS">Devoir surveillé</option>
+                <option value="Interro">Interrogation</option>
+                <option value="Oral">Oral</option>
+                <option value="TP">Travaux pratiques</option>
+              </select>
+              <input type="text" id="saisie-sujet" class="input-pro"
+                placeholder="Sujet / intitulé (ex: Fractions, Pythagore…)" style="flex:1;min-width:200px" />
+              <input type="date" id="saisie-date" class="input-pro" />
+              <button class="btn-primary-pro" onclick="sauvegarderNotes()">💾 Enregistrer</button>
+            </div>
+            <div id="saisie-table-container"></div>
+          </div>
+
+          <!-- Panneau historique -->
+          <div id="notes-panel-historique" class="hidden">
+            <div id="histo-liste-evaluations" style="display:flex;flex-direction:column;gap:12px"></div>
+          </div>
+        </div>
+      </section>
+      <section id="section-prof-appel" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Feuille d'appel</h2>
+            <p class="section-subtitle" id="appel-cours-info"></p>
+          </div>
+        </div>
+        <div class="appel-container">
+          <div class="appel-controls">
+            <select id="appel-classe" class="select-pro" onchange="loadAppel()">
+              <option value="">Sélectionner une classe</option>
+              <optgroup label="── 6ème">
+                <option value="6A">6ème A</option>
+                <option value="6B">6ème B</option>
+                <option value="6C">6ème C</option>
+                <option value="6D">6ème D</option>
+              </optgroup>
+              <optgroup label="── 5ème">
+                <option value="5A">5ème A</option>
+                <option value="5B">5ème B</option>
+                <option value="5C">5ème C</option>
+                <option value="5D">5ème D</option>
+              </optgroup>
+              <optgroup label="── 4ème">
+                <option value="4A">4ème A</option>
+                <option value="4B">4ème B</option>
+                <option value="4C">4ème C</option>
+                <option value="4D">4ème D</option>
+              </optgroup>
+              <optgroup label="── 3ème">
+                <option value="3A">3ème A</option>
+                <option value="3B">3ème B</option>
+                <option value="3C">3ème C</option>
+                <option value="3D">3ème D</option>
+              </optgroup>
+            </select>
+            <button class="btn-primary-pro" onclick="validerAppel()">✅ Valider l'appel</button>
+          </div>
+          <div id="appel-list"></div>
+        </div>
+      </section>
+      <section id="section-prof-messagerie" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Messagerie</h2>
+            <p class="section-subtitle">Style Pronote — tous vos échanges</p>
+          </div>
+          <button class="btn-primary-pro" onclick="openComposePro()">✉️ Nouveau message</button>
+        </div>
+
+        <!-- Onglets messagerie -->
+        <div
+          style="display:flex;gap:4px;background:#F1F5F9;border-radius:10px;padding:4px;margin-bottom:16px;width:fit-content">
+          <button class="msg-tab active" id="msg-tab-recus" onclick="switchMsgTab('recus')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+              <polyline points="22 6 12 13 2 6" />
+            </svg>
+            Reçus <span class="msg-tab-badge" id="badge-recus"></span>
+          </button>
+          <button class="msg-tab" id="msg-tab-envoyes" onclick="switchMsgTab('envoyes')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+            Envoyés
+          </button>
+          <button class="msg-tab" id="msg-tab-chat-classe" onclick="switchMsgTab('chat-classe')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+            </svg>
+            Chat classe <span class="msg-tab-badge" id="badge-chat-classe">3</span>
+          </button>
+          <button class="msg-tab" id="msg-tab-chat-profs" onclick="switchMsgTab('chat-profs')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87" />
+              <path d="M16 3.13a4 4 0 010 7.75" />
+            </svg>
+            Profs <span class="msg-tab-badge" id="badge-chat-profs">1</span>
+          </button>
+        </div>
+
+        <!-- Layout principal : liste + vue -->
+        <div class="pronote-mail-layout">
+
+          <!-- Colonne gauche : liste des conversations -->
+          <div class="pronote-mail-sidebar" id="pronote-mail-sidebar">
+            <!-- Reçus -->
+            <div id="msg-panel-recus" class="msg-panel">
+              <div class="pronote-msg-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input type="text" placeholder="Rechercher…" oninput="filterMsgList('recus', this.value)"
+                  style="border:none;outline:none;font-family:'Sora',sans-serif;font-size:12px;width:100%;background:transparent">
+              </div>
+              <div id="msg-list-recus"></div>
+            </div>
+
+            <!-- Envoyés -->
+            <div id="msg-panel-envoyes" class="msg-panel hidden">
+              <div class="pronote-msg-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input type="text" placeholder="Rechercher…" oninput="filterMsgList('envoyes', this.value)"
+                  style="border:none;outline:none;font-family:'Sora',sans-serif;font-size:12px;width:100%;background:transparent">
+              </div>
+              <div id="msg-list-envoyes"></div>
+            </div>
+
+            <!-- Chat classe -->
+            <div id="msg-panel-chat-classe" class="msg-panel hidden">
+              <div
+                style="padding:10px 12px;font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #E2E8F0">
+                Sélectionner une classe</div>
+              <div id="msg-list-chat-classe"></div>
+            </div>
+
+            <!-- Chat profs -->
+            <div id="msg-panel-chat-profs" class="msg-panel hidden">
+              <div
+                style="padding:10px 12px;font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #E2E8F0">
+                Conversations entre collègues</div>
+              <div id="msg-list-chat-profs"></div>
+            </div>
+          </div>
+
+          <!-- Colonne droite : contenu du message / chat -->
+          <div class="pronote-mail-view" id="pronote-mail-view">
+            <div class="mail-placeholder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22 6 12 13 2 6" />
+              </svg>
+              <p>Sélectionnez une conversation</p>
+              <span style="font-size:12px;color:#CBD5E1">Vos messages s'afficheront ici</span>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section id="section-prof-planning" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Mon planning</h2>
+          </div>
+        </div>
+        <div id="planning-appel-log" class="hidden" style="margin-bottom:20px"></div>
+        <div class="timetable-container">
+          <div id="prof-timetable" style="overflow-x:auto"></div>
+        </div>
+      </section>
+
+      <!-- ── SECTION : PROGRESSION ANNUELLE ── -->
+      <section id="section-prof-progression" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Progression annuelle</h2>
+            <p class="section-subtitle">Suivi des chapitres par classe</p>
+          </div>
+          <button class="btn-primary" onclick="openModalAddChapitre()" style="display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Ajouter un chapitre
+          </button>
+        </div>
+
+        <!-- Sélecteur de classe -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" width="16">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+          </svg>
+          <select id="prog-classe-select" class="select-pro" onchange="renderProgression()" style="width:180px">
+            <option value="">— Choisir une classe —</option>
+          </select>
+          <div style="flex:1"></div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#64748B">
+            <span style="display:inline-block;width:12px;height:12px;background:#16A34A;border-radius:3px"></span>
+            Terminé
+            <span
+              style="display:inline-block;width:12px;height:12px;background:#2563EB;border-radius:3px;margin-left:8px"></span>
+            En cours
+            <span
+              style="display:inline-block;width:12px;height:12px;background:#E2E8F0;border-radius:3px;margin-left:8px"></span>
+            À venir
+          </div>
+        </div>
+
+        <!-- Vue année scolaire (barre globale) -->
+        <div id="prog-annee-bar" style="display:none;margin-bottom:28px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:#64748B;margin-bottom:6px">
+            <span>Sept. 2025</span>
+            <span id="prog-annee-label" style="font-weight:700;color:#1E293B"></span>
+            <span>Juin 2026</span>
+          </div>
+          <div style="height:10px;background:#F1F5F9;border-radius:20px;overflow:hidden;position:relative">
+            <div id="prog-annee-fill"
+              style="height:100%;background:linear-gradient(90deg,#2563EB,#7C3AED);border-radius:20px;width:0%;transition:width 1s ease">
+            </div>
+            <div id="prog-annee-cursor"
+              style="position:absolute;top:-4px;width:18px;height:18px;background:#fff;border:3px solid #2563EB;border-radius:50%;transform:translateX(-50%);transition:left 1s ease;box-shadow:0 2px 6px rgba(37,99,235,.4)">
+            </div>
+          </div>
+          <div style="text-align:center;margin-top:6px;font-size:12px;color:#64748B">Avancement global : <strong
+              id="prog-pct-global" style="color:#2563EB">0%</strong></div>
+        </div>
+
+        <!-- Timeline des chapitres -->
+        <div id="prog-timeline-container">
+          <div style="text-align:center;padding:60px 20px;color:#94A3B8">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40"
+              style="margin:0 auto 12px;display:block;opacity:.4">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
+            <p style="font-size:14px">Sélectionnez une classe pour voir sa progression</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODAL AJOUTER CHAPITRE -->
+  <div id="modal-add-chapitre" class="modal hidden">
+    <div class="modal-backdrop" onclick="closeModalAddChapitre()"></div>
+    <div class="modal-box" style="max-width:520px">
+      <div class="modal-header">
+        <h3>📚 Ajouter un chapitre</h3>
+        <button onclick="closeModalAddChapitre()">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Classe</label>
+            <select id="ch-classe" class="select-pro" style="width:100%">
+              <option value="">— Choisir —</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Numéro</label>
+            <input type="number" id="ch-num" class="input-pro" placeholder="ex: 3" min="1" max="30"
+              style="width:100%" />
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Titre du
+            chapitre</label>
+          <input type="text" id="ch-titre" class="input-pro" placeholder="ex: Les fractions — opérations"
+            style="width:100%" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Date de
+              début</label>
+            <input type="date" id="ch-debut" class="input-pro" style="width:100%" />
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Date de fin
+              prévue</label>
+            <input type="date" id="ch-fin" class="input-pro" style="width:100%" />
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Statut</label>
+          <select id="ch-statut" class="select-pro" style="width:100%">
+            <option value="a_venir">📅 À venir</option>
+            <option value="en_cours">⏳ En cours</option>
+            <option value="termine">✅ Terminé</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Description
+            (optionnel)</label>
+          <textarea id="ch-desc" class="modal-textarea" placeholder="Notions abordées, objectifs…"
+            style="height:70px"></textarea>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+          <button onclick="closeModalAddChapitre()" class="reply-btn-cancel">Annuler</button>
+          <button onclick="validerAddChapitre()" class="btn-primary">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════
+     PAGE 5 : PORTAIL PARENTS
+════════════════════════════════════════════════ -->
+  <div id="page-parent" class="page">
+    <aside class="sidebar sidebar-parent" style="background:linear-gradient(160deg,#4A1D96,#7C3AED)">
+      <div class="sidebar-logo">
+        <div class="sidebar-icon"><svg viewBox="0 0 48 48" fill="none">
+            <path d="M24 4L44 14V22C44 32.5 35.5 42 24 44C12.5 42 4 32.5 4 22V14L24 4Z" stroke="currentColor"
+              stroke-width="2.5" />
+            <path d="M16 24H32M24 16V32" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+          </svg></div>
+        <div><span class="sidebar-school">Asimov</span><span class="sidebar-role">Espace Parents</span></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" onclick="showParentSection('parent-accueil', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+          </svg> Tableau de bord
+        </a>
+        <a href="#" class="nav-item" onclick="showParentSection('parent-edt', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg> Emploi du temps
+        </a>
+        <a href="#" class="nav-item" onclick="showParentSection('parent-notes', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg> Notes & Résultats
+        </a>
+        <a href="#" class="nav-item" onclick="showParentSection('parent-absences', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+          </svg> Absences & Retards
+          <span class="nav-badge" id="parent-abs-badge" style="display:none">0</span>
+        </a>
+        <a href="#" class="nav-item" onclick="showParentSection('parent-devoirs', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg> Devoirs
+        </a>
+        <a href="#" class="nav-item" onclick="showParentSection('parent-progression', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg> Progression
+        </a>
+        <a href="#" class="nav-item" onclick="showParentSection('parent-messagerie', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22 6 12 13 2 6" />
+          </svg> Messagerie
+          <span class="nav-badge" id="parent-msg-badge" style="display:none">0</span>
+        </a>
+      </nav>
+      <!-- Sélecteur enfant — juste au-dessus du profil parent -->
+      <div id="parent-enfant-selector" style="display:none;padding:10px 12px;border-top:1px solid rgba(255,255,255,.1)">
+        <div
+          style="font-size:9px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;padding:0 4px">
+          Mon enfant</div>
+        <div id="parent-enfants-btns" style="display:flex;flex-direction:column;gap:4px"></div>
+      </div>
+      <div class="sidebar-user">
+        <div class="user-avatar" id="parent-avatar" style="background:linear-gradient(135deg,#6D28D9,#A78BFA)">SL</div>
+        <div class="user-info">
+          <span id="parent-fullname" class="user-name">Sophie Lefebvre</span>
+          <span id="parent-role-label" class="user-role">Parent d'élève</span>
+        </div>
+        <button class="btn-logout" onclick="logout()" title="Déconnexion"><svg viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg></button>
+      </div>
+      <button class="btn-dark-mode" id="btn-dark-parent" onclick="toggleDarkMode()" style="margin:0 0 12px"><span
+          class="dark-icon">🌙</span><span class="dark-label"> Mode sombre</span></button>
+    </aside>
+
+    <main class="dashboard-main">
+
+      <!-- ACCUEIL PARENT -->
+      <section id="section-parent-accueil" class="dash-section active">
+        <div class="section-header">
+          <div>
+            <h2 id="parent-welcome">Bonjour</h2>
+            <p class="section-subtitle" id="parent-date"></p>
+          </div>
+          <div class="header-actions" style="position:relative">
+            <div class="notif-btn" onclick="toggleParentNotifs()" id="notif-btn-parent">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
+              </svg>
+              <span class="notif-dot" id="notif-dot-parent"></span>
+              <span class="notif-count" id="notif-count-parent">0</span>
+            </div>
+            <div class="notif-panel hidden" id="notif-panel-parent">
+              <div class="notif-panel-header"><span>Notifications</span><button onclick="clearParentNotifs()">Tout
+                  marquer lu</button></div>
+              <div class="notif-list" id="notif-list-parent"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Enfant card -->
+        <div id="parent-enfant-card"
+          style="background:linear-gradient(135deg,#4A1D96,#7C3AED);border-radius:16px;padding:24px;margin-bottom:24px;color:#fff;display:flex;align-items:center;gap:20px">
+          <div id="parent-enfant-avatar"
+            style="width:64px;height:64px;border-radius:16px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;flex-shrink:0">
+            ML</div>
+          <div style="flex:1">
+            <div id="parent-enfant-nom" style="font-size:20px;font-weight:800">Martin Lefebvre</div>
+            <div id="parent-enfant-info" style="font-size:13px;opacity:.8;margin-top:3px">4ème B · Demi-pensionnaire
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;opacity:.7;margin-bottom:4px">Moyenne générale</div>
+            <div id="parent-enfant-moy" style="font-size:36px;font-weight:800">–</div>
+            <div style="font-size:11px;opacity:.6">/20</div>
+          </div>
+        </div>
+        <!-- Stats rapides -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
+          <div class="stat-card stat-blue" style="cursor:pointer" onclick="showParentSection('parent-notes',null)">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              </svg></div>
+            <div class="stat-content"><span class="stat-value" id="parent-stat-moy">–</span><span
+                class="stat-label">Moyenne générale</span></div>
+          </div>
+          <div class="stat-card stat-orange" style="cursor:pointer" onclick="showParentSection('parent-absences',null)">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+              </svg></div>
+            <div class="stat-content"><span class="stat-value" id="parent-stat-abs">0</span><span
+                class="stat-label">Absences</span></div>
+          </div>
+          <div class="stat-card stat-green" style="cursor:pointer" onclick="showParentSection('parent-devoirs',null)">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 11 12 14 22 4" />
+              </svg></div>
+            <div class="stat-content"><span class="stat-value" id="parent-stat-devoirs">0</span><span
+                class="stat-label">Devoirs à rendre</span></div>
+          </div>
+          <div class="stat-card stat-purple" style="cursor:pointer"
+            onclick="showParentSection('parent-messagerie',null)">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+              </svg></div>
+            <div class="stat-content"><span class="stat-value" id="parent-stat-msg">0</span><span
+                class="stat-label">Messages non lus</span></div>
+          </div>
+        </div>
+        <div class="dashboard-row">
+          <div class="card card-large">
+            <div class="card-header">
+              <h3>Emploi du temps — Aujourd'hui</h3>
+            </div>
+            <div id="parent-today-schedule"></div>
+          </div>
+          <div class="card card-medium">
+            <div class="card-header">
+              <h3>Prochains devoirs</h3><button class="card-link"
+                onclick="showParentSection('parent-devoirs',null)">Voir tout →</button>
+            </div>
+            <div id="parent-home-devoirs"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-header">
+            <h3>Dernières notes</h3><button class="card-link" onclick="showParentSection('parent-notes',null)">Voir tout
+              →</button>
+          </div>
+          <div class="notes-recent" id="parent-home-notes"></div>
+        </div>
+      </section>
+
+      <!-- NOTES PARENT -->
+      <section id="section-parent-notes" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Notes & Résultats</h2>
+            <p class="section-subtitle" id="parent-notes-subtitle"></p>
+          </div>
+        </div>
+        <div id="parent-notes-grid" class="notes-grid"></div>
+      </section>
+
+      <!-- ABSENCES PARENT -->
+      <section id="section-parent-absences" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Absences & Retards</h2>
+            <p class="section-subtitle" id="parent-abs-subtitle"></p>
+          </div>
+          <button class="btn-primary" onclick="openParentJustif()" style="display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14">
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+            </svg>
+            Justifier une absence
+          </button>
+        </div>
+        <div id="parent-absences-list"></div>
+      </section>
+
+      <!-- EDT PARENT -->
+      <section id="section-parent-edt" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Emploi du temps</h2>
+            <p class="section-subtitle" id="parent-edt-subtitle"></p>
+          </div>
+          <div class="week-nav">
+            <button class="week-btn" onclick="changeParentWeek(-1)">‹</button>
+            <span id="parent-edt-week-label" style="font-size:13px;color:#64748B;padding:0 10px"></span>
+            <button class="week-btn" onclick="changeParentWeek(1)">›</button>
+          </div>
+        </div>
+        <div class="timetable-container">
+          <div id="parent-edt-container"></div>
+        </div>
+      </section>
+
+      <!-- DEVOIRS PARENT -->
+      <section id="section-parent-devoirs" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Devoirs à faire</h2>
+            <p class="section-subtitle">Cahier de textes de votre enfant</p>
+          </div>
+        </div>
+        <div id="parent-devoirs-list"></div>
+      </section>
+
+      <!-- PROGRESSION PARENT -->
+      <section id="section-parent-progression" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Progression annuelle</h2>
+            <p class="section-subtitle" id="parent-prog-subtitle"></p>
+          </div>
+        </div>
+        <div id="parent-prog-container"></div>
+      </section>
+
+      <!-- MESSAGERIE PARENT -->
+      <section id="section-parent-messagerie" class="dash-section">
+        <div class="section-header">
+          <div>
+            <h2>Messagerie</h2>
+            <p class="section-subtitle">Échanges avec l'équipe pédagogique</p>
+          </div>
+          <button class="btn-primary" onclick="openParentCompose()" style="display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Nouveau message
+          </button>
+        </div>
+        <div id="parent-msg-list" style="display:flex;flex-direction:column;gap:10px"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+     PAGE 4 : DASHBOARD PRINCIPAL / DIRECTION
+════════════════════════════════════════════════ -->
+  <div id="page-principal" class="page">
+    <div class="principal-layout">
+
+      <!-- SIDEBAR DIRECTION -->
+      <aside class="sidebar sidebar-principal">
+        <div class="sidebar-logo">
+          <div class="sidebar-icon"><svg viewBox="0 0 48 48" fill="none">
+              <path d="M24 4L44 14V22C44 32.5 35.5 42 24 44C12.5 42 4 32.5 4 22V14L24 4Z" stroke="currentColor"
+                stroke-width="2.5" />
+              <path d="M16 24H32M24 16V32" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+            </svg></div>
+          <div><span class="sidebar-school">Asimov</span><span class="sidebar-role"
+              id="admin-role-label">Direction</span></div>
+        </div>
+        <nav class="sidebar-nav">
+          <a href="#" class="nav-item active" onclick="showAdminSection('admin-accueil', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            </svg>
+            Tableau de bord
+          </a>
+          <!-- Direction uniquement -->
+          <a href="#" class="nav-item direction-only" onclick="showAdminSection('admin-demandes', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <line x1="19" y1="8" x2="19" y2="14" />
+              <line x1="22" y1="11" x2="16" y2="11" />
+            </svg>
+            Demandes de compte
+            <span class="nav-badge" id="demandes-badge-nav">0</span>
+          </a>
+          <a href="#" class="nav-item direction-only" onclick="showAdminSection('admin-comptes', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+            </svg>
+            Gestion des comptes
+          </a>
+          <a href="#" class="nav-item direction-only" onclick="showAdminSection('admin-absences-profs', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            Absences professeurs
+            <span class="nav-badge" id="abs-profs-badge" style="display:none">0</span>
+          </a>
+          <a href="#" class="nav-item direction-only" onclick="showAdminSection('admin-retards-profs', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            Retards professeurs
+            <span class="nav-badge" id="retards-badge-nav" style="display:none">0</span>
+          </a>
+          <a href="#" class="nav-item" onclick="showAdminSection('admin-messagerie', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+              <polyline points="22 6 12 13 2 6" />
+            </svg>
+            Messagerie
+            <span class="nav-badge" id="admin-msg-badge">1</span>
+          </a>
+          <a href="#" class="nav-item direction-only" onclick="showAdminSection('admin-classes', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            Classes & EDT
+          </a>
+          <a href="#" class="nav-item direction-only" onclick="showAdminSection('admin-stats', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="20" x2="18" y2="10" />
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="6" y1="20" x2="6" y2="14" />
+            </svg>
+            Statistiques
+          </a>
+          <a href="#" class="nav-item direction-only" onclick="showAdminSection('admin-faq-messages', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+            </svg>
+            Messages site
+            <span class="nav-badge" id="faq-msg-badge" style="display:none">0</span>
+          </a>
+          <!-- CPE uniquement -->
+          <a href="#" class="nav-item cpe-only" style="display:none"
+            onclick="showAdminSection('cpe-absences-eleves', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <line x1="23" y1="18" x2="17" y2="18" />
+            </svg>
+            Absences élèves
+            <span class="nav-badge" id="cpe-abs-badge" style="display:none">0</span>
+          </a>
+          <a href="#" class="nav-item cpe-only" style="display:none"
+            onclick="showAdminSection('cpe-planning-prof', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+            </svg>
+            Planning profs
+          </a>
+          <a href="#" class="nav-item cpe-only" style="display:none"
+            onclick="showAdminSection('cpe-emploi-temps', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            Emploi du temps
+          </a>
+          <a href="#" class="nav-item cpe-only" style="display:none" onclick="showAdminSection('cpe-reunions', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87" />
+              <path d="M16 3.13a4 4 0 010 7.75" />
+            </svg>
+            Réunions
+            <span class="nav-badge" id="cpe-reunions-badge" style="display:none">0</span>
+          </a>
+        </nav>
+        <div class="sidebar-user">
+          <div class="user-avatar" id="admin-avatar" style="background:linear-gradient(135deg,#7C3AED,#A78BFA)">IB</div>
+          <div class="user-info">
+            <span id="admin-fullname" class="user-name">Isabelle Benoît</span>
+            <span id="admin-poste" class="user-role">Chef d'établissement</span>
+          </div>
+          <button class="btn-logout" onclick="logout()" title="Déconnexion"><svg viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg></button>
+        </div>
+        <button class="btn-dark-mode" id="btn-dark-admin" onclick="toggleDarkMode()" style="margin:0 12px 12px"><span
+            class="dark-icon">🌙</span><span class="dark-label"> Mode sombre</span></button>
+      </aside>
+
+      <!-- CONTENU PRINCIPAL -->
+      <main class="dashboard-main">
+
+        <!-- ── SECTION : TABLEAU DE BORD DIRECTION ── -->
+        <section id="section-admin-accueil" class="dash-section active">
+          <div class="section-header">
+            <div>
+              <h2 id="admin-welcome">Bonjour</h2>
+              <p class="section-subtitle" id="admin-today-date"></p>
+            </div>
+            <div class="header-actions">
+              <div class="notif-btn" onclick="toggleAdminNotifs()" id="notif-btn-admin" title="Notifications">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
+                </svg>
+                <span class="notif-dot" id="notif-dot-admin" style="display:none"></span>
+                <span class="notif-count" id="notif-count-admin" style="display:none">0</span>
+              </div>
+              <div class="notif-panel hidden" id="notif-panel-admin">
+                <div class="notif-panel-header"><span>Notifications</span><button onclick="clearAllAdminNotifs()">Tout
+                    marquer lu</button></div>
+                <div class="notif-list" id="notif-list-admin"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Stats rapides -->
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px">
+            <div class="stat-card stat-blue" style="cursor:pointer" onclick="showAdminSection('admin-demandes',null)">
+              <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                </svg></div>
+              <div class="stat-content"><span class="stat-value" id="dash-stat-demandes">0</span><span
+                  class="stat-label">Demandes en attente</span></div>
+            </div>
+            <div class="stat-card stat-green" style="cursor:pointer" onclick="showAdminSection('admin-comptes',null)">
+              <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                </svg></div>
+              <div class="stat-content"><span class="stat-value" id="dash-stat-comptes">0</span><span
+                  class="stat-label">Comptes actifs</span></div>
+            </div>
+            <div class="stat-card stat-orange" style="cursor:pointer"
+              onclick="showAdminSection('admin-absences-profs',null)">
+              <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                </svg></div>
+              <div class="stat-content"><span class="stat-value" id="dash-stat-absences">0</span><span
+                  class="stat-label">Profs absents</span></div>
+            </div>
+            <div class="stat-card" style="cursor:pointer;border-left:3px solid #D97706"
+              onclick="showAdminSection('admin-retards-profs',null)">
+              <div class="stat-icon" style="background:#FEF9C3"><svg viewBox="0 0 24 24" fill="none" stroke="#D97706"
+                  stroke-width="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg></div>
+              <div class="stat-content"><span class="stat-value" id="dash-stat-retards"
+                  style="color:#D97706">0</span><span class="stat-label">Retards en cours</span></div>
+            </div>
+            <div class="stat-card stat-purple" style="cursor:pointer"
+              onclick="showAdminSection('admin-messagerie',null)">
+              <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                </svg></div>
+              <div class="stat-content"><span class="stat-value" id="dash-stat-messages">0</span><span
+                  class="stat-label">Messages non lus</span></div>
+            </div>
+          </div>
+          <!-- Bouton rapide retard -->
+          <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap">
+            <button onclick="openModalRetardProf()"
+              style="display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#D97706,#F59E0B);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(217,119,6,.3)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              Signaler un retard prof
+            </button>
+            <button onclick="openModalAbsenceProf()"
+              style="display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#DC2626,#EF4444);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(220,38,38,.3)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+              </svg>
+              Signaler une absence prof
+            </button>
+          </div>
+          <div class="dashboard-row">
+            <div class="card card-large">
+              <div class="card-header">
+                <h3>Absences du jour</h3><button class="card-link"
+                  onclick="showAdminSection('admin-absences-profs',null)">Voir tout →</button>
+              </div>
+              <div id="admin-absences-today"></div>
+            </div>
+            <div class="card card-medium">
+              <div class="card-header">
+                <h3>Dernières demandes</h3><button class="card-link"
+                  onclick="showAdminSection('admin-demandes',null)">Voir tout →</button>
+              </div>
+              <div id="admin-demandes-recent"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── SECTION : DEMANDES DE COMPTE ── -->
+        <section id="section-admin-demandes" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Demandes de compte</h2>
+              <p class="section-subtitle">Validez ou refusez les demandes d'accès à l'ENT</p>
+            </div>
+            <button class="btn-primary" onclick="refreshDemandes()" style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
+              </svg>
+              Actualiser
+            </button>
+          </div>
+          <div class="principal-stats">
+            <div class="pstat-card pstat-orange">
+              <div class="pstat-value" id="stat-attente">0</div>
+              <div class="pstat-label">⏳ En attente</div>
+            </div>
+            <div class="pstat-card pstat-green">
+              <div class="pstat-value" id="stat-approuve">0</div>
+              <div class="pstat-label">✅ Approuvées</div>
+            </div>
+            <div class="pstat-card">
+              <div class="pstat-value" id="stat-refuse">0</div>
+              <div class="pstat-label">❌ Refusées</div>
+            </div>
+          </div>
+          <div class="history-tabs" style="margin-bottom:20px">
+            <button class="history-tab active" onclick="filterDemandes('en_attente', this)">⏳ En attente</button>
+            <button class="history-tab" onclick="filterDemandes('approuve', this)">✅ Approuvées</button>
+            <button class="history-tab" onclick="filterDemandes('refuse', this)">❌ Refusées</button>
+            <button class="history-tab" onclick="filterDemandes('toutes', this)">📋 Toutes</button>
+          </div>
+          <div class="demandes-list" id="demandes-list"></div>
+        </section>
+
+        <!-- ── SECTION : GESTION DES COMPTES PAR STATUT ── -->
+        <section id="section-admin-comptes" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Gestion des comptes</h2>
+              <p class="section-subtitle">Utilisateurs actifs par statut</p>
+            </div>
+            <input type="text" placeholder="🔍 Rechercher un utilisateur…" class="input-pro" style="width:240px"
+              oninput="filterComptes(this.value)" />
+          </div>
+          <!-- Onglets par statut -->
+          <div
+            style="display:flex;gap:4px;background:#F1F5F9;border-radius:10px;padding:4px;margin-bottom:20px;width:fit-content">
+            <button class="msg-tab active" id="comptes-tab-tous" onclick="switchComptesTab('tous')">Tous <span
+                class="msg-tab-badge" id="badge-comptes-tous"></span></button>
+            <button class="msg-tab" id="comptes-tab-eleve" onclick="switchComptesTab('eleve')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12">
+                <path d="M12 14l9-5-9-5-9 5 9 5z" />
+              </svg>
+              Élèves <span class="msg-tab-badge" id="badge-comptes-eleve"></span>
+            </button>
+            <button class="msg-tab" id="comptes-tab-professeur" onclick="switchComptesTab('professeur')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+              </svg>
+              Professeurs <span class="msg-tab-badge" id="badge-comptes-professeur"></span>
+            </button>
+            <button class="msg-tab" id="comptes-tab-direction" onclick="switchComptesTab('direction')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+              </svg>
+              Direction <span class="msg-tab-badge" id="badge-comptes-direction"></span>
+            </button>
+          </div>
+          <div id="comptes-list" style="display:flex;flex-direction:column;gap:10px"></div>
+        </section>
+
+        <!-- ── SECTION : ABSENCES PROFESSEURS ── -->
+        <section id="section-admin-absences-profs" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Absences professeurs</h2>
+              <p class="section-subtitle">Suivi des absences et remplacements</p>
+            </div>
+            <button class="btn-primary" onclick="openModalAbsenceProf()"
+              style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Signaler une absence
+            </button>
+          </div>
+          <!-- Stats -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+            <div class="pstat-card pstat-orange">
+              <div class="pstat-value" id="abs-stat-today">0</div>
+              <div class="pstat-label">Absences aujourd'hui</div>
+            </div>
+            <div class="pstat-card">
+              <div class="pstat-value" id="abs-stat-semaine">0</div>
+              <div class="pstat-label">Cette semaine</div>
+            </div>
+            <div class="pstat-card pstat-green">
+              <div class="pstat-value" id="abs-stat-remplaces">0</div>
+              <div class="pstat-label">Remplacés</div>
+            </div>
+          </div>
+          <!-- Filtres -->
+          <div
+            style="display:flex;gap:4px;background:#F1F5F9;border-radius:10px;padding:4px;margin-bottom:16px;width:fit-content">
+            <button class="msg-tab active" id="abs-tab-actives" onclick="switchAbsTab('actives')">En cours</button>
+            <button class="msg-tab" id="abs-tab-toutes" onclick="switchAbsTab('toutes')">Toutes</button>
+            <button class="msg-tab" id="abs-tab-historique" onclick="switchAbsTab('historique')">Historique</button>
+          </div>
+          <div id="absences-profs-list" style="display:flex;flex-direction:column;gap:12px"></div>
+        </section>
+
+        <!-- ── SECTION : MESSAGERIE ADMIN (améliorée) ── -->
+        <section id="section-admin-messagerie" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Messagerie</h2>
+              <p class="section-subtitle">Direction — communications</p>
+            </div>
+            <button class="btn-primary" onclick="openCompose()" style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Nouveau message
+            </button>
+          </div>
+          <!-- Onglets -->
+          <div
+            style="display:flex;gap:4px;background:#F1F5F9;border-radius:10px;padding:4px;margin-bottom:16px;width:fit-content">
+            <button class="msg-tab active" id="admin-msg-tab-recus" onclick="switchAdminMsgTab('recus')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22 6 12 13 2 6" />
+              </svg>
+              Reçus <span class="msg-tab-badge" id="admin-badge-recus"></span>
+            </button>
+            <button class="msg-tab" id="admin-msg-tab-favoris" onclick="switchAdminMsgTab('favoris')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12">
+                <polygon
+                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+              Favoris <span class="msg-tab-badge" id="admin-badge-favoris"></span>
+            </button>
+            <button class="msg-tab" id="admin-msg-tab-corbeille" onclick="switchAdminMsgTab('corbeille')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4h6v2" />
+              </svg>
+              Corbeille <span class="msg-tab-badge" id="admin-badge-corbeille"></span>
+            </button>
+          </div>
+          <div class="pronote-mail-layout">
+            <div class="pronote-mail-sidebar">
+              <div id="admin-msg-panel-recus" class="msg-panel">
+                <div id="admin-mail-list-recus"></div>
+              </div>
+              <div id="admin-msg-panel-favoris" class="msg-panel hidden">
+                <div id="admin-mail-list-favoris"></div>
+              </div>
+              <div id="admin-msg-panel-corbeille" class="msg-panel hidden">
+                <div id="admin-mail-list-corbeille"></div>
+              </div>
+            </div>
+            <div class="pronote-mail-view" id="admin-mail-view">
+              <div class="mail-placeholder">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22 6 12 13 2 6" />
+                </svg>
+                <p>Sélectionnez un message</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── SECTION : CLASSES ── -->
+        <section id="section-admin-classes" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Classes & Emplois du temps</h2>
+            </div>
+          </div>
+          <div id="admin-classes-list"
+            style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px"></div>
+        </section>
+
+        <!-- ── SECTION : MESSAGES SITE VITRINE ── -->
+        <section id="section-admin-faq-messages" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Messages du site</h2>
+              <p class="section-subtitle">Messages reçus via le formulaire de contact</p>
+            </div>
+            <button class="btn-primary" onclick="refreshFaqMessages()" style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
+              </svg>
+              Actualiser
+            </button>
+          </div>
+          <div class="mail-layout">
+            <div class="mail-list" id="faq-msg-list"></div>
+            <div class="mail-view" id="faq-msg-view">
+              <div class="mail-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="1.5" width="48">
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                </svg>
+                <p>Sélectionnez un message</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── SECTION : RETARDS PROFESSEURS (Direction) ── -->
+        <section id="section-admin-retards-profs" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Retards professeurs</h2>
+              <p class="section-subtitle">Retards signalés en temps réel</p>
+            </div>
+            <button class="btn-primary" onclick="openModalRetardProf()" style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Signaler un retard
+            </button>
+          </div>
+          <div id="retards-profs-list" style="display:flex;flex-direction:column;gap:8px"></div>
+        </section>
+
+        <!-- ── SECTION : ABSENCES ÉLÈVES (CPE) ── -->
+        <section id="section-cpe-absences-eleves" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Absences élèves</h2>
+              <p class="section-subtitle">Suivi des absences et justificatifs</p>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+            <div class="pstat-card pstat-orange">
+              <div class="pstat-value" id="cpe-abs-count">3</div>
+              <div class="pstat-label">Absences non justifiées</div>
+            </div>
+            <div class="pstat-card">
+              <div class="pstat-value" id="cpe-abs-total">12</div>
+              <div class="pstat-label">Total cette semaine</div>
+            </div>
+            <div class="pstat-card pstat-green">
+              <div class="pstat-value" id="cpe-abs-just">9</div>
+              <div class="pstat-label">Justifiées</div>
+            </div>
+          </div>
+          <div style="background:#fff;border-radius:12px;border:1px solid #E2E8F0;padding:20px">
+            <p style="color:#64748B;font-size:13px;margin-bottom:14px;font-weight:600">Absences en attente de
+              justificatif</p>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div
+                style="display:flex;align-items:center;gap:14px;padding:12px;background:#FEF2F2;border-radius:10px;border:1px solid #FECACA">
+                <div
+                  style="width:36px;height:36px;border-radius:10px;background:#DC2626;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px">
+                  ML</div>
+                <div style="flex:1">
+                  <div style="font-weight:700;font-size:13px">Martin Lefebvre</div>
+                  <div style="font-size:12px;color:#64748B">4ème B · Jeudi 06/03 — Journée complète</div>
+                </div>
+                <span
+                  style="background:#FEE2E2;color:#DC2626;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">Non
+                  justifiée</span>
+                <button onclick="showToast('📧 Relance envoyée aux parents')"
+                  style="background:#fff;border:1px solid #FECACA;border-radius:8px;padding:6px 12px;cursor:pointer;color:#DC2626;font-size:12px;font-weight:600;font-family:'Sora',sans-serif">Relancer</button>
+              </div>
+              <div
+                style="display:flex;align-items:center;gap:14px;padding:12px;background:#FEF9C3;border-radius:10px;border:1px solid #FDE68A">
+                <div
+                  style="width:36px;height:36px;border-radius:10px;background:#D97706;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px">
+                  SB</div>
+                <div style="flex:1">
+                  <div style="font-weight:700;font-size:13px">Sofia Benali</div>
+                  <div style="font-size:12px;color:#64748B">3ème A · Mardi 04/03 — Matin complet</div>
+                </div>
+                <span
+                  style="background:#FEF3C7;color:#D97706;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">En
+                  attente</span>
+                <button onclick="showToast('✅ Absence justifiée')"
+                  style="background:#fff;border:1px solid #FDE68A;border-radius:8px;padding:6px 12px;cursor:pointer;color:#D97706;font-size:12px;font-weight:600;font-family:'Sora',sans-serif">Valider</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── SECTION : PLANNING PROFS (CPE) ── -->
+        <section id="section-cpe-planning-prof" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Planning professeurs</h2>
+              <p class="section-subtitle">Emploi du temps de chaque enseignant</p>
+            </div>
+          </div>
+          <div style="background:#fff;border-radius:12px;border:1px solid #E2E8F0;padding:20px">
+            <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
+              <span style="font-size:12px;font-weight:700;color:#64748B">Professeur :</span>
+              <select id="cpe-prof-select" class="select-pro" onchange="renderCpePlanningProf()" style="width:240px">
+                <option value="">— Choisir un professeur —</option>
+              </select>
+            </div>
+            <div id="cpe-planning-prof-container" style="overflow-x:auto">
+              <p style="color:#94A3B8;font-size:13px;text-align:center;padding:20px">Sélectionnez un professeur</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── SECTION : EMPLOI DU TEMPS (CPE) ── -->
+        <section id="section-cpe-emploi-temps" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Emploi du temps</h2>
+              <p class="section-subtitle">Consultation par classe</p>
+            </div>
+          </div>
+          <div style="background:#fff;border-radius:12px;border:1px solid #E2E8F0;padding:20px">
+            <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+              <span style="font-size:12px;font-weight:700;color:#64748B;align-self:center">Classe :</span>
+              <select id="cpe-classe-select" class="select-pro" onchange="renderCpeEdt()" style="width:200px">
+                <option value="">— Choisir une classe —</option>
+              </select>
+            </div>
+            <div id="cpe-edt-container" style="overflow-x:auto">
+              <p style="color:#94A3B8;font-size:13px;text-align:center;padding:20px">Sélectionnez une classe</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── SECTION : RÉUNIONS (CPE) ── -->
+        <section id="section-cpe-reunions" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Réunions</h2>
+              <p class="section-subtitle">Gestion des réunions et conseils de classe</p>
+            </div>
+            <button class="btn-primary" onclick="showToast('📅 Fonctionnalité bientôt disponible')"
+              style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Planifier une réunion
+            </button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div
+              style="background:#fff;border-radius:12px;border:1px solid #E2E8F0;padding:18px 20px;display:flex;align-items:center;gap:16px">
+              <div
+                style="width:44px;height:44px;background:#EFF6FF;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px">
+                📅</div>
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:14px">Conseil de classe 4ème B</div>
+                <div style="font-size:12px;color:#64748B;margin-top:3px">Jeudi 25 mars 2026 · 17h30 · Salle de réunion A
+                </div>
+              </div>
+              <span
+                style="background:#DBEAFE;color:#1E3A8A;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700">À
+                venir</span>
+            </div>
+            <div
+              style="background:#fff;border-radius:12px;border:1px solid #E2E8F0;padding:18px 20px;display:flex;align-items:center;gap:16px">
+              <div
+                style="width:44px;height:44px;background:#FEF9C3;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px">
+                👨‍👩‍👧</div>
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:14px">Réunion parents — famille Moreau</div>
+                <div style="font-size:12px;color:#64748B;margin-top:3px">Lundi 20 mars 2026 · 17h00 · Bureau CPE</div>
+              </div>
+              <span
+                style="background:#FEF9C3;color:#92400E;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700">Demain</span>
+            </div>
+            <div
+              style="background:#fff;border-radius:12px;border:1px solid #E2E8F0;padding:18px 20px;display:flex;align-items:center;gap:16px">
+              <div
+                style="width:44px;height:44px;background:#F0FDF4;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px">
+                🎓</div>
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:14px">Réunion pédagogique équipe 3ème</div>
+                <div style="font-size:12px;color:#64748B;margin-top:3px">Mercredi 26 mars 2026 · 16h00 · Salle des
+                  professeurs</div>
+              </div>
+              <span
+                style="background:#DCFCE7;color:#14532D;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700">À
+                venir</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── SECTION : STATISTIQUES DIRECTION ── -->
+        <section id="section-admin-stats" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Statistiques</h2>
+              <p class="section-subtitle">Tableau de bord analytique de l'établissement</p>
+            </div>
+            <button class="btn-primary" onclick="renderStatsDirection()"
+              style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
+              </svg>
+              Actualiser
+            </button>
+          </div>
+          <div id="stats-direction-container"></div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- MODAL SIGNALER ABSENCE PROF -->
+  <div id="modal-absence-prof" class="modal hidden">
+    <div class="modal-backdrop" onclick="closeModalAbsenceProf()"></div>
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-header">
+        <h3>Signaler une absence professeur</h3><button onclick="closeModalAbsenceProf()">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Professeur
+            concerné</label>
+          <select id="abs-prof-select" class="select-pro" style="width:100%">
+            <option value="">Sélectionner un professeur</option>
+            <option value="prof1">M. Dupont (Mathématiques)</option>
+            <option value="prof2">Mme Laurent (Français)</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Date
+              début</label>
+            <input type="date" id="abs-date-debut" class="input-pro" style="width:100%" />
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Date fin</label>
+            <input type="date" id="abs-date-fin" class="input-pro" style="width:100%" />
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Motif</label>
+          <select id="abs-motif" class="select-pro" style="width:100%">
+            <option value="maladie">Maladie</option>
+            <option value="formation">Formation</option>
+            <option value="conge">Congé</option>
+            <option value="retard">Retard confirmé</option>
+            <option value="autre">Autre</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Note
+            (optionnel)</label>
+          <textarea id="abs-note" class="modal-textarea" placeholder="Informations complémentaires…"
+            style="height:70px"></textarea>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+          <button onclick="closeModalAbsenceProf()" class="reply-btn-cancel">Annuler</button>
+          <button onclick="validerAbsenceProf()" class="btn-primary">Enregistrer l'absence</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL SIGNALER RETARD PROF -->
+  <div id="modal-retard-prof" class="modal hidden">
+    <div class="modal-backdrop" onclick="closeModalRetardProf()"></div>
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-header">
+        <h3>⏰ Signaler un retard professeur</h3><button onclick="closeModalRetardProf()">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Professeur
+            concerné</label>
+          <select id="ret-prof-select" class="select-pro" style="width:100%">
+            <option value="">Sélectionner un professeur</option>
+            <option value="prof1">M. Dupont (Mathématiques)</option>
+            <option value="prof2">Mme Laurent (Français)</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Heure du
+              cours</label>
+            <select id="ret-heure" class="select-pro" style="width:100%">
+              <option>08h00</option>
+              <option>09h00</option>
+              <option>10h15</option>
+              <option>11h15</option>
+              <option>14h00</option>
+              <option>15h00</option>
+              <option>16h15</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Retard estimé
+              (min)</label>
+            <input type="number" id="ret-duree" class="input-pro" value="15" min="5" max="60" style="width:100%" />
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Classe
+            concernée</label>
+          <select id="ret-classe" class="select-pro" style="width:100%">
+            <option>4ème B</option>
+            <option>4ème A</option>
+            <option>3ème A</option>
+            <option>5ème A</option>
+            <option>6ème A</option>
+            <option>6ème B</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Motif du
+            retard</label>
+          <select id="ret-motif-type" class="select-pro" style="width:100%"
+            onchange="toggleRetardMotifDetail(this.value)">
+            <option value="bouchon">🚗 Bouchon / circulation</option>
+            <option value="panne">🔧 Panne de véhicule</option>
+            <option value="transports">🚇 Retard transports en commun</option>
+            <option value="raison_perso">👤 Raison personnelle</option>
+            <option value="autre">📌 Autre</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:4px;display:block">Précisions
+            (optionnel)</label>
+          <input type="text" id="ret-motif" class="input-pro" placeholder="Ex: Bouchon sur A6, signalé à 07h52…"
+            style="width:100%" />
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+          <button onclick="closeModalRetardProf()" class="reply-btn-cancel">Annuler</button>
+          <button onclick="validerRetardProfFromModal()" class="btn-primary"
+            style="background:linear-gradient(135deg,#D97706,#F59E0B)">Enregistrer le retard</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL COMPOSE -->
+  <div id="modal-compose" class="modal hidden">
+    <div class="modal-backdrop" onclick="closeCompose()"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Nouveau message</h3><button onclick="closeCompose()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="text" placeholder="Destinataire" class="modal-input" />
+        <input type="text" placeholder="Objet" class="modal-input" />
+        <textarea placeholder="Votre message..." class="modal-textarea"></textarea>
+        <button class="btn-send">Envoyer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="database.js"></script>
+  <script src="app.js"></script>
+</body>
+
+</html>
