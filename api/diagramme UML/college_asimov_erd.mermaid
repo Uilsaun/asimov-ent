@@ -1,0 +1,196 @@
+erDiagram
+
+  %% ─── TABLES DE RÉFÉRENCE ───────────────────────────────────
+
+  ROLES {
+    int     id      PK
+    varchar libelle
+  }
+
+  NIVEAUX {
+    int     id  PK
+    varchar nom
+  }
+
+  CLASSES {
+    int     id        PK
+    varchar code
+    varchar nom
+    int     niveau_id FK
+  }
+
+  MATIERES {
+    int     id  PK
+    varchar nom
+  }
+
+  STATUTS {
+    int     id      PK
+    varchar libelle
+  }
+
+  REGIMES {
+    int     id      PK
+    varchar libelle
+  }
+
+  %% ─── UTILISATEURS ──────────────────────────────────────────
+
+  USERS {
+    varchar   id             PK
+    varchar   password_hash
+    int       role_id        FK
+    varchar   prenom
+    varchar   nom
+    varchar   avatar
+    varchar   email
+    int       statut_id      FK
+    int       classe_id      FK
+    varchar   date_naissance
+    int       matiere_id     FK
+    varchar   poste
+    int       regime_id      FK
+    varchar   tel
+    varchar   annee_scolaire
+    timestamp created_at
+  }
+
+  %% ─── RELATIONS ─────────────────────────────────────────────
+
+  PARENT_ELEVES {
+    varchar parent_id FK
+    varchar eleve_id  FK
+    varchar lien
+  }
+
+  PROF_CLASSES {
+    varchar prof_id   FK
+    int     classe_id FK
+  }
+
+  %% ─── PÉDAGOGIE ─────────────────────────────────────────────
+
+  NOTES_MATIERES {
+    int     id         PK
+    varchar eleve_id   FK
+    int     matiere_id FK
+    decimal moyenne
+  }
+
+  EVALUATIONS {
+    int     id              PK
+    int     note_matiere_id FK
+    varchar titre
+    decimal note
+    int     sur
+    varchar date_eval
+  }
+
+  DEVOIRS {
+    int     id         PK
+    varchar eleve_id   FK
+    int     matiere_id FK
+    varchar titre
+    varchar date_rendu
+    boolean urgent
+    boolean done
+    varchar prof
+  }
+
+  PLANNING_PROF {
+    int     id        PK
+    varchar prof_id   FK
+    enum    jour
+    varchar heure
+    int     classe_id FK
+    varchar salle
+  }
+
+  %% ─── VIE SCOLAIRE ──────────────────────────────────────────
+
+  ABSENCES {
+    int       id       PK
+    varchar   eleve_id FK
+    enum      type
+    varchar   date_abs
+    text      detail
+    varchar   statut
+    timestamp created_at
+  }
+
+  MESSAGES {
+    int       id              PK
+    varchar   destinataire_id FK
+    varchar   expediteur
+    varchar   sujet
+    text      corps
+    boolean   lu
+    varchar   date_msg
+    timestamp created_at
+  }
+
+  %% ─── COMPTES ───────────────────────────────────────────────
+
+  ELEVES_PREINSCRITS {
+    varchar cle            PK
+    varchar prenom
+    varchar nom
+    int     classe_id      FK
+    varchar date_naissance
+    varchar annee_scolaire
+  }
+
+  DEMANDES_COMPTE {
+    varchar   id              PK
+    varchar   cle
+    varchar   identifiant
+    varchar   password_hash
+    varchar   prenom
+    varchar   nom
+    int       classe_id       FK
+    varchar   date_naissance
+    varchar   date_demande
+    enum      statut
+    text      commentaire
+    varchar   date_traitement
+    timestamp created_at
+  }
+
+  MENUS_CANTINE {
+    int     id      PK
+    varchar jour
+    varchar entree
+    varchar plat
+    varchar dessert
+    varchar veggie
+  }
+
+  %% ─── CARDINALITÉS ──────────────────────────────────────────
+
+  ROLES    ||--o{ USERS          : "role_id"
+  STATUTS  ||--o{ USERS          : "statut_id"
+  REGIMES  ||--o{ USERS          : "regime_id"
+  CLASSES  ||--o{ USERS          : "classe_id"
+  MATIERES ||--o{ USERS          : "matiere_id"
+  NIVEAUX  ||--o{ CLASSES        : "niveau_id"
+
+  USERS    ||--o{ PARENT_ELEVES  : "parent_id (parent)"
+  USERS    ||--o{ PARENT_ELEVES  : "eleve_id (élève)"
+  USERS    ||--o{ PROF_CLASSES   : "prof_id"
+  CLASSES  ||--o{ PROF_CLASSES   : "classe_id"
+
+  USERS          ||--o{ NOTES_MATIERES : "eleve_id"
+  MATIERES       ||--o{ NOTES_MATIERES : "matiere_id"
+  NOTES_MATIERES ||--o{ EVALUATIONS    : "note_matiere_id"
+
+  USERS    ||--o{ DEVOIRS        : "eleve_id"
+  MATIERES ||--o{ DEVOIRS        : "matiere_id"
+
+  USERS    ||--o{ PLANNING_PROF  : "prof_id"
+  CLASSES  ||--o{ PLANNING_PROF  : "classe_id"
+
+  USERS    ||--o{ ABSENCES       : "eleve_id"
+  USERS    ||--o{ MESSAGES       : "destinataire_id"
+
+  CLASSES  ||--o{ ELEVES_PREINSCRITS : "classe_id"
+  CLASSES  ||--o{ DEMANDES_COMPTE    : "classe_id"
