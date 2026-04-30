@@ -33,7 +33,7 @@ namespace AsimovENT
 
             // Chemin vers api/server.js (relatif à l'exe)
             string exeDir = AppContext.BaseDirectory;
-            string apiDir = Path.Combine(exeDir, "api");
+            string apiDir = @"D:\Coll-ge Asi\coll-ge-asimov\asimov-ent\asimov\test\CollegeAsimovV2\asimov-ent\api";
             string serverJs = Path.Combine(apiDir, "server.js");
 
             if (!File.Exists(serverJs))

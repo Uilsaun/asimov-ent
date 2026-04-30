@@ -1,0 +1,14 @@
+# Node
+api/node_modules/
+api/.env
+
+# C# build
+desktop/AsimovENT-Desktop/bin/
+desktop/AsimovENT-Desktop/obj/
+desktop/AsimovENT-Desktop/*.log
+desktop/AsimovENT-Desktop/*.exe
+desktop/AsimovENT-Desktop/*.dll
+desktop/AsimovENT-Desktop/*.pdb
+desktop/AsimovENT-Desktop/*.deps.json
+desktop/AsimovENT-Desktop/*.runtimeconfig.json
+desktop/AsimovENT-Desktop/Microsoft.Web.*

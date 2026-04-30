@@ -3,8 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="Collège Asimov — ENT"
-        Height="800" Width="1280"
-        MinHeight="600" MinWidth="900"
+        Height="800"
+        Width="1280"
+        MinHeight="600"
+        MinWidth="900"
         WindowStartupLocation="CenterScreen"
         Background="#0F172A">
 
@@ -13,15 +15,17 @@
         <!-- ══════════════════════════════════════════
              ÉCRAN DE CHARGEMENT (visible au démarrage)
              ══════════════════════════════════════════ -->
-        <Grid x:Name="SplashScreen" Background="#0F172A" Panel.ZIndex="10">
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+        <Grid x:Name="SplashScreen"
+                Background="#0F172A"
+                Panel.ZIndex="10">
+            <StackPanel VerticalAlignment="Center"
+                    HorizontalAlignment="Center">
 
                 <!-- Logo / Titre -->
-                <TextBlock Text="COLLÈGE ASIMOV"
+                <TextBlock Text="C O L L È G E   A S I M O V"
                            Foreground="#3B82F6"
                            FontSize="13"
                            FontWeight="Bold"
-                           LetterSpacing="4"
                            HorizontalAlignment="Center"
                            Margin="0,0,0,8"/>
 
@@ -39,9 +43,17 @@
                            Margin="0,0,0,48"/>
 
                 <!-- Barre de progression -->
-                <Border Width="280" Height="4" CornerRadius="2" Background="#1E293B" Margin="0,0,0,16">
-                    <Border x:Name="ProgressBar" Width="0" Height="4" CornerRadius="2"
-                            Background="#3B82F6" HorizontalAlignment="Left"/>
+                <Border Width="280"
+                        Height="4"
+                        CornerRadius="2"
+                        Background="#1E293B"
+                        Margin="0,0,0,16">
+                    <Border x:Name="ProgressBar"
+                            Width="0"
+                            Height="4"
+                            CornerRadius="2"
+                            Background="#3B82F6"
+                            HorizontalAlignment="Left"/>
                 </Border>
 
                 <!-- Message de statut -->
