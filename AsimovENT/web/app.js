@@ -5205,11 +5205,19 @@ function updateProfNavBadge() {
 
 /* ─── SECRÉTAIRE — RESTRICTIONS ─── */
 function applySecretaireRestrictions() {
-  const allowed = ['admin-accueil', 'admin-comptes', 'admin-messagerie', 'admin-faq-messages'];
+  const allowed = ['admin-accueil', 'admin-comptes', 'admin-messagerie', 'admin-faq-messages',
+    'sec-moyennes', 'sec-referents', 'sec-stages', 'sec-projets'];
   document.querySelectorAll('#page-principal .nav-item').forEach(item => {
     const oc = item.getAttribute('onclick') || '';
     item.style.display = allowed.some(a => oc.includes(a)) ? '' : 'none';
   });
+  // Afficher les items secrétariat
+  document.querySelectorAll('.sec-only').forEach(el => el.style.display = '');
+  // Initialiser les sections secrétariat
+  initSecMoyennes();
+  initSecReferents();
+  initSecStages();
+  initSecProjets();
 }
 
 /* ─── CPE PLANNING PROFS ─── */
@@ -5531,3 +5539,651 @@ async function renderStatsDirection() {
 }
 
 
+
+
+/* ══════════════════════════════════════════════════════════════
+   SECRÉTARIAT — MOYENNES SEMESTRIELLES
+   ══════════════════════════════════════════════════════════════ */
+
+// Stockage local des moyennes saisies (en production → DB via API)
+const SEC_MOYENNES = {}; // { "6A_S1": { "lefebvre.martin.12032011": { moy: 14.5, statut: 'en_attente' } } }
+
+function initSecMoyennes() {
+  const sel = $('sec-moy-classe-select');
+  if (!sel || sel.options.length > 1) return;
+  Object.keys(DB.classes).forEach(code => {
+    const opt = document.createElement('option');
+    opt.value = code; opt.textContent = DB.classes[code].nom;
+    sel.appendChild(opt);
+  });
+}
+
+function renderMoyennesTable() {
+  const classe = $('sec-moy-classe-select')?.value;
+  const semestre = $('sec-moy-semestre-select')?.value || 'S1';
+  const cont = $('sec-moyennes-container');
+  if (!cont) return;
+
+  if (!classe) {
+    cont.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:40px;font-size:13px">Sélectionnez une classe et un semestre</p>';
+    return;
+  }
+
+  const key = `${classe}_${semestre}`;
+  if (!SEC_MOYENNES[key]) SEC_MOYENNES[key] = {};
+
+  const eleves = DB.classes[classe]?.eleves || [];
+  if (!eleves.length) {
+    cont.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:40px;font-size:13px">Aucun élève dans cette classe</p>';
+    return;
+  }
+
+  const isSecretaire = currentUser?.role === 'secretaire';
+  const isProviseur = currentUser?.role === 'principal';
+
+  const rows = eleves.map(e => {
+    const userId = Object.keys(DB.users).find(id => {
+      const u = DB.users[id];
+      return u.prenom === e.prenom && u.nom === e.nom;
+    }) || e.prenom.toLowerCase();
+
+    const entry = SEC_MOYENNES[key][userId] || { moy: '', statut: 'non_saisie' };
+    const statutColor = { non_saisie: '#94A3B8', en_attente: '#F59E0B', valide: '#10B981', corrige: '#3B82F6' };
+    const statutLabel = { non_saisie: '—', en_attente: 'En attente', valide: '✓ Validée', corrige: '✏ Corrigée' };
+
+    const canEdit = isSecretaire && entry.statut === 'non_saisie';
+    const canValidate = isProviseur && entry.statut === 'en_attente';
+    const canCorrect = isProviseur && (entry.statut === 'en_attente' || entry.statut === 'valide');
+
+    return `<tr style="border-bottom:1px solid #F1F5F9">
+      <td style="padding:12px 16px;font-weight:600;color:#0F172A;font-size:13px">${e.prenom} ${e.nom}</td>
+      <td style="padding:12px 16px;font-size:13px;color:#475569">${DB.classes[classe]?.nom || classe}</td>
+      <td style="padding:12px 16px">
+        ${canEdit
+        ? `<input type="number" min="0" max="20" step="0.01" value="${entry.moy}"
+               style="width:80px;padding:6px 10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;font-family:inherit"
+               id="moy-input-${userId}" placeholder="—" />`
+        : `<span style="font-weight:700;font-size:14px;color:${entry.moy !== '' ? '#0F172A' : '#94A3B8'}">${entry.moy !== '' ? entry.moy + '/20' : '—'}</span>`
+      }
+      </td>
+      <td style="padding:12px 16px">
+        <span style="font-size:12px;font-weight:600;color:${statutColor[entry.statut] || '#94A3B8'}">${statutLabel[entry.statut] || '—'}</span>
+      </td>
+      <td style="padding:12px 16px">
+        ${canEdit
+        ? `<button onclick="saisirMoyenne('${key}','${userId}')" class="btn-primary" style="padding:6px 12px;font-size:12px">Enregistrer</button>`
+        : ''
+      }
+        ${canValidate
+        ? `<button onclick="validerMoyenne('${key}','${userId}')" style="background:#D1FAE5;color:#065F46;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer;margin-right:6px">Valider</button>`
+        : ''
+      }
+        ${canCorrect
+        ? `<button onclick="corrigerMoyenne('${key}','${userId}')" style="background:#DBEAFE;color:#1E40AF;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer">Corriger</button>`
+        : ''
+      }
+      </td>
+    </tr>`;
+  }).join('');
+
+  cont.innerHTML = `
+    <div style="background:#fff;border-radius:14px;border:1px solid #E2E8F0;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:#F8FAFC">
+            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Élève</th>
+            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Classe</th>
+            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Moyenne ${semestre}</th>
+            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Statut</th>
+            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Action</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    ${isSecretaire ? `<div style="text-align:right;margin-top:12px"><button class="btn-primary" onclick="saisirToutesMoyennes('${key}','${classe}')">Enregistrer toutes les moyennes</button></div>` : ''}
+  `;
+}
+
+function saisirMoyenne(key, userId) {
+  const input = $(`moy-input-${userId}`);
+  const val = parseFloat(input?.value);
+  if (isNaN(val) || val < 0 || val > 20) { alert('Veuillez saisir une note entre 0 et 20.'); return; }
+  if (!SEC_MOYENNES[key]) SEC_MOYENNES[key] = {};
+  SEC_MOYENNES[key][userId] = { moy: val, statut: 'en_attente', saisiPar: currentUser?.id, saisiLe: new Date().toLocaleDateString('fr-FR') };
+  renderMoyennesTable();
+}
+
+function saisirToutesMoyennes(key, classe) {
+  const eleves = DB.classes[classe]?.eleves || [];
+  let count = 0;
+  eleves.forEach(e => {
+    const userId = Object.keys(DB.users).find(id => {
+      const u = DB.users[id]; return u.prenom === e.prenom && u.nom === e.nom;
+    }) || e.prenom.toLowerCase();
+    const input = $(`moy-input-${userId}`);
+    if (!input) return;
+    const val = parseFloat(input.value);
+    if (!isNaN(val) && val >= 0 && val <= 20) {
+      if (!SEC_MOYENNES[key]) SEC_MOYENNES[key] = {};
+      if (!SEC_MOYENNES[key][userId] || SEC_MOYENNES[key][userId].statut === 'non_saisie') {
+        SEC_MOYENNES[key][userId] = { moy: val, statut: 'en_attente', saisiPar: currentUser?.id, saisiLe: new Date().toLocaleDateString('fr-FR') };
+        count++;
+      }
+    }
+  });
+  if (count > 0) { alert(`${count} moyenne(s) enregistrée(s). En attente de validation par le proviseur.`); renderMoyennesTable(); }
+  else alert('Aucune nouvelle moyenne à enregistrer.');
+}
+
+function validerMoyenne(key, userId) {
+  if (SEC_MOYENNES[key]?.[userId]) {
+    SEC_MOYENNES[key][userId].statut = 'valide';
+    SEC_MOYENNES[key][userId].validePar = currentUser?.id;
+    SEC_MOYENNES[key][userId].valideLE = new Date().toLocaleDateString('fr-FR');
+    renderMoyennesTable();
+  }
+}
+
+function corrigerMoyenne(key, userId) {
+  const nouvelleNote = prompt('Saisir la note corrigée (0-20) :');
+  const val = parseFloat(nouvelleNote);
+  if (isNaN(val) || val < 0 || val > 20) { alert('Note invalide.'); return; }
+  if (SEC_MOYENNES[key]?.[userId]) {
+    SEC_MOYENNES[key][userId].moy = val;
+    SEC_MOYENNES[key][userId].statut = 'corrige';
+    SEC_MOYENNES[key][userId].corrigePar = currentUser?.id;
+    SEC_MOYENNES[key][userId].corrigeLE = new Date().toLocaleDateString('fr-FR');
+    renderMoyennesTable();
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SECRÉTARIAT — ENSEIGNANTS RÉFÉRENTS
+   ══════════════════════════════════════════════════════════════ */
+
+// { eleveId: profId }
+const REFERENTS = {};
+let _referentEleveEnCours = null;
+
+function initSecReferents() {
+  renderReferents();
+}
+
+function renderReferents() {
+  const contProfs = $('referents-par-prof');
+  const contSans = $('eleves-sans-referent');
+  const badge = $('badge-sans-referent');
+  if (!contProfs || !contSans) return;
+
+  const profs = Object.values(DB.users).filter(u => u.role === 'professeur');
+  const eleves = Object.values(DB.users).filter(u => u.role === 'eleve');
+
+  // Par prof
+  contProfs.innerHTML = profs.map(prof => {
+    const mesEleves = eleves.filter(e => REFERENTS[e.id] === prof.id);
+    return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:${mesEleves.length ? 10 : 0}px">
+        <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#10B981,#059669);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff">${prof.prenom[0]}${prof.nom[0]}</div>
+        <div>
+          <div style="font-weight:700;font-size:13px;color:#0F172A">${prof.prenom} ${prof.nom}</div>
+          <div style="font-size:11px;color:#64748B">${prof.matiere || 'Professeur'} · ${mesEleves.length} élève(s) référent${mesEleves.length > 1 ? 's' : ''}</div>
+        </div>
+      </div>
+      ${mesEleves.map(e => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#F8FAFC;border-radius:8px;margin-bottom:4px">
+          <span style="font-size:12px;color:#475569">${e.prenom} ${e.nom} <span style="color:#94A3B8">${e.classe || ''}</span></span>
+          <button onclick="retirerReferent('${e.id}')" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:11px;font-weight:600">Retirer</button>
+        </div>
+      `).join('')}
+    </div>`;
+  }).join('');
+
+  // Sans référent
+  const sansRef = eleves.filter(e => !REFERENTS[e.id]);
+  if (badge) { badge.textContent = sansRef.length; badge.style.display = sansRef.length ? '' : 'none'; }
+
+  const navBadge = $('badge-referents-nav');
+  if (navBadge) { navBadge.textContent = sansRef.length; navBadge.style.display = sansRef.length > 0 ? '' : 'none'; }
+
+  contSans.innerHTML = sansRef.length === 0
+    ? '<p style="color:#10B981;font-size:13px;text-align:center;padding:20px">✅ Tous les élèves ont un référent</p>'
+    : sansRef.map(e => `
+      <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #FED7AA;border-radius:10px;padding:12px 14px">
+        <div>
+          <div style="font-weight:600;font-size:13px;color:#0F172A">${e.prenom} ${e.nom}</div>
+          <div style="font-size:11px;color:#94A3B8">${e.classe || ''}</div>
+        </div>
+        <button onclick="openModalReferent('${e.id}')" class="btn-primary" style="padding:6px 12px;font-size:12px">Affecter</button>
+      </div>
+    `).join('');
+}
+
+function openModalReferent(eleveId) {
+  _referentEleveEnCours = eleveId;
+  const eleve = DB.users[eleveId];
+  const nomEl = $('modal-referent-eleve-nom');
+  if (nomEl && eleve) nomEl.textContent = `Élève : ${eleve.prenom} ${eleve.nom}`;
+
+  const sel = $('modal-referent-prof-select');
+  if (sel) {
+    const profs = Object.values(DB.users).filter(u => u.role === 'professeur');
+    sel.innerHTML = '<option value="">— Choisir un professeur —</option>'
+      + profs.map(p => `<option value="${p.id}">${p.prenom} ${p.nom} — ${p.matiere || ''}</option>`).join('');
+  }
+  const modal = $('modal-affecter-referent');
+  if (modal) { modal.classList.remove('hidden'); modal.style.display = 'flex'; }
+}
+
+function closeModalReferent() {
+  const modal = $('modal-affecter-referent');
+  if (modal) { modal.classList.add('hidden'); modal.style.display = 'none'; }
+  _referentEleveEnCours = null;
+}
+
+function confirmerAffectationReferent() {
+  const profId = $('modal-referent-prof-select')?.value;
+  if (!profId || !_referentEleveEnCours) { alert('Veuillez choisir un professeur.'); return; }
+  REFERENTS[_referentEleveEnCours] = profId;
+  closeModalReferent();
+  renderReferents();
+}
+
+function retirerReferent(eleveId) {
+  if (!confirm('Retirer ce référent ?')) return;
+  delete REFERENTS[eleveId];
+  renderReferents();
+}
+
+function affectationRoundRobin() {
+  const profs = Object.values(DB.users).filter(u => u.role === 'professeur');
+  const elevesNonAffectes = Object.values(DB.users).filter(u => u.role === 'eleve' && !REFERENTS[u.id]);
+  if (!profs.length) { alert('Aucun professeur disponible.'); return; }
+  if (!elevesNonAffectes.length) { alert('Tous les élèves ont déjà un référent.'); return; }
+
+  // Compter les élèves actuels par prof pour équilibrer
+  const comptes = {};
+  profs.forEach(p => { comptes[p.id] = Object.values(REFERENTS).filter(v => v === p.id).length; });
+
+  elevesNonAffectes.forEach(eleve => {
+    // Prend le prof avec le moins d'élèves
+    const profMin = profs.reduce((a, b) => comptes[a.id] <= comptes[b.id] ? a : b);
+    REFERENTS[eleve.id] = profMin.id;
+    comptes[profMin.id]++;
+  });
+
+  alert(`✅ ${elevesNonAffectes.length} élève(s) affecté(s) automatiquement.`);
+  renderReferents();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SECRÉTARIAT — STAGES
+   ══════════════════════════════════════════════════════════════ */
+
+const SEC_STAGES = [
+  {
+    id: 'stg1', eleveId: 'lefebvre.martin.12032011', eleveNom: 'Martin Lefebvre', classe: '4ème B',
+    statut: 'recherche',
+    recherches: [
+      { entreprise: 'Société Informatique Grenoble', contact: 'M. Durand', tel: '04 76 00 11 22', lettresEnvoyees: 3, lettresRecues: 1, entretiens: [{ date: '15/03/2025', resultat: 'En attente' }] },
+      { entreprise: 'Web & Co', contact: 'Mme Martin', tel: '06 12 34 56 78', lettresEnvoyees: 1, lettresRecues: 0, entretiens: [] },
+    ],
+    convention: null, attestation: null,
+  },
+  {
+    id: 'stg2', eleveId: 'benali.sofia.07092010', eleveNom: 'Sofia Benali', classe: '3ème A',
+    statut: 'convention_validee',
+    recherches: [
+      { entreprise: 'Cabinet Médical Alpin', contact: 'Dr. Rousseau', tel: '04 76 55 44 33', lettresEnvoyees: 2, lettresRecues: 2, entretiens: [{ date: '10/02/2025', resultat: 'Accepté' }] },
+    ],
+    convention: { entreprise: 'Cabinet Médical Alpin', dateDebut: '02/06/2025', dateFin: '13/06/2025', tuteur: 'Dr. Rousseau', valide: true, valideParReferent: true },
+    attestation: null,
+  },
+  {
+    id: 'stg3', eleveId: 'lefebvre.emma.05112013', eleveNom: 'Emma Lefebvre', classe: '6ème A',
+    statut: 'atteste',
+    recherches: [
+      { entreprise: 'École Maternelle Les Lutins', contact: 'Mme Bernard', tel: '04 76 22 11 00', lettresEnvoyees: 1, lettresRecues: 1, entretiens: [{ date: '05/01/2025', resultat: 'Accepté' }] },
+    ],
+    convention: { entreprise: 'École Maternelle Les Lutins', dateDebut: '20/01/2025', dateFin: '31/01/2025', tuteur: 'Mme Bernard', valide: true, valideParReferent: true },
+    attestation: { signee: true, dateSignature: '01/02/2025', commentaire: 'Excellent stage, élève très motivée.' },
+  },
+];
+
+function initSecStages() {
+  // Remplir les filtres de classe
+  const sel = $('sec-stages-classe-filter');
+  if (sel && sel.options.length === 1) {
+    Object.keys(DB.classes).forEach(code => {
+      const opt = document.createElement('option');
+      opt.value = code; opt.textContent = DB.classes[code].nom;
+      sel.appendChild(opt);
+    });
+  }
+  renderStagesSection();
+}
+
+function switchStagesTab(tab) {
+  ['recherches', 'conventions', 'attestations'].forEach(t => {
+    const btn = $(`stages-tab-${t}`); const panel = $(`stages-panel-${t}`);
+    if (btn) btn.classList.toggle('active', t === tab);
+    if (panel) panel.style.display = t === tab ? '' : 'none';
+  });
+}
+
+function renderStagesSection() {
+  const classeFilter = $('sec-stages-classe-filter')?.value;
+  const statutFilter = $('sec-stages-statut-filter')?.value;
+
+  let stages = [...SEC_STAGES];
+  if (classeFilter) stages = stages.filter(s => {
+    const u = DB.users[s.eleveId]; return u?.classe?.includes(DB.classes[classeFilter]?.nom?.replace('ème', '').trim()) || false;
+  });
+  if (statutFilter) stages = stages.filter(s => s.statut === statutFilter);
+
+  renderRecherchesList(stages);
+  renderConventionsList(stages);
+  renderAttestationsList(stages);
+}
+
+function renderRecherchesList(stages) {
+  const cont = $('stages-recherches-list'); if (!cont) return;
+  if (!stages.length) { cont.innerHTML = '<p style="color:#94A3B8;font-size:13px;text-align:center;padding:20px">Aucun stage trouvé</p>'; return; }
+
+  cont.innerHTML = stages.map(s => {
+    const totalLettres = s.recherches.reduce((t, r) => t + r.lettresEnvoyees, 0);
+    const totalRecues = s.recherches.reduce((t, r) => t + r.lettresRecues, 0);
+    const totalEntretiens = s.recherches.reduce((t, r) => t + r.entretiens.length, 0);
+    const statutColors = { recherche: '#F59E0B', convention_en_attente: '#3B82F6', convention_validee: '#10B981', stage_en_cours: '#8B5CF6', atteste: '#059669' };
+    const statutLabels = { recherche: 'En recherche', convention_en_attente: 'Convention en attente', convention_validee: 'Convention validée', stage_en_cours: 'Stage en cours', atteste: 'Attesté' };
+
+    return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px;box-shadow:0 2px 8px rgba(0,0,0,.04)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#3B82F6,#1E3A8A);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff">${s.eleveNom.split(' ').map(n => n[0]).join('')}</div>
+          <div>
+            <div style="font-weight:700;font-size:14px;color:#0F172A">${s.eleveNom}</div>
+            <div style="font-size:12px;color:#64748B">${s.classe}</div>
+          </div>
+        </div>
+        <span style="background:${statutColors[s.statut]}20;color:${statutColors[s.statut]};border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600">${statutLabels[s.statut]}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+        <div style="background:#F8FAFC;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:20px;font-weight:800;color:#1E3A8A">${s.recherches.length}</div>
+          <div style="font-size:11px;color:#64748B">Entreprise(s) contactée(s)</div>
+        </div>
+        <div style="background:#F8FAFC;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:20px;font-weight:800;color:#1E3A8A">${totalLettres} / ${totalRecues}</div>
+          <div style="font-size:11px;color:#64748B">Lettres envoyées / reçues</div>
+        </div>
+        <div style="background:#F8FAFC;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:20px;font-weight:800;color:#1E3A8A">${totalEntretiens}</div>
+          <div style="font-size:11px;color:#64748B">Entretien(s)</div>
+        </div>
+      </div>
+      ${s.recherches.map(r => `
+        <div style="background:#F8FAFC;border-radius:8px;padding:10px;margin-bottom:6px;font-size:12px">
+          <div style="font-weight:600;color:#0F172A;margin-bottom:2px">${r.entreprise}</div>
+          <div style="color:#64748B">Contact : ${r.contact} · ${r.tel}</div>
+          ${r.entretiens.map(e => `<div style="color:#7C3AED;margin-top:4px">📅 Entretien le ${e.date} — ${e.resultat}</div>`).join('')}
+        </div>
+      `).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderConventionsList(stages) {
+  const cont = $('stages-conventions-list'); if (!cont) return;
+  const avecConv = stages.filter(s => s.convention);
+
+  if (!avecConv.length) { cont.innerHTML = '<p style="color:#94A3B8;font-size:13px;text-align:center;padding:20px">Aucune convention enregistrée</p>'; return; }
+
+  cont.innerHTML = avecConv.map(s => {
+    const c = s.convention;
+    return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;font-size:14px;color:#0F172A">${s.eleveNom} — ${c.entreprise}</div>
+          <div style="font-size:12px;color:#64748B;margin-top:2px">Du ${c.dateDebut} au ${c.dateFin} · Tuteur : ${c.tuteur}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          ${c.valideParReferent ? '<span style="background:#D1FAE5;color:#065F46;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600">✓ Référent</span>' : '<span style="background:#FEF3C7;color:#92400E;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600">⏳ Référent</span>'}
+          ${c.valide ? '<span style="background:#D1FAE5;color:#065F46;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600">✓ Signée</span>' : '<span style="background:#FEF3C7;color:#92400E;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600">⏳ En attente</span>'}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button style="background:#EFF6FF;color:#1E40AF;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">📄 Voir la convention PDF</button>
+        ${!c.valide ? `<button onclick="validerConvention('${s.id}')" style="background:#D1FAE5;color:#065F46;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">✓ Valider la convention</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderAttestationsList(stages) {
+  const cont = $('stages-attestations-list'); if (!cont) return;
+  const avecAtt = stages.filter(s => s.attestation);
+
+  if (!avecAtt.length) { cont.innerHTML = '<p style="color:#94A3B8;font-size:13px;text-align:center;padding:20px">Aucune attestation enregistrée</p>'; return; }
+
+  cont.innerHTML = avecAtt.map(s => {
+    const a = s.attestation;
+    return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:14px;color:#0F172A">${s.eleveNom}</div>
+          <div style="font-size:12px;color:#64748B;margin-top:2px">Stage chez ${s.convention?.entreprise || '—'} · Signée le ${a.dateSignature}</div>
+          ${a.commentaire ? `<div style="font-size:12px;color:#475569;margin-top:6px;font-style:italic">"${a.commentaire}"</div>` : ''}
+        </div>
+        <span style="background:#D1FAE5;color:#065F46;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600">✓ Attestation signée</span>
+      </div>
+      <div style="margin-top:12px">
+        <button style="background:#EFF6FF;color:#1E40AF;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">📄 Télécharger l'attestation PDF</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function validerConvention(stageId) {
+  const stage = SEC_STAGES.find(s => s.id === stageId);
+  if (stage?.convention) { stage.convention.valide = true; renderStagesSection(); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SECRÉTARIAT — PROJETS D'ÉTABLISSEMENT
+   ══════════════════════════════════════════════════════════════ */
+
+const SEC_PROJETS = [
+  {
+    id: 'proj1', titre: 'Jardin Pédagogique', description: 'Création et entretien d\'un jardin potager au sein du collège.',
+    dateDebut: '2025-09-01', dateFin: '2026-06-30', statut: 'en_cours',
+    responsableId: 'lefebvre.martin.12032011',
+    participants: [
+      { eleveId: 'lefebvre.martin.12032011', eleveNom: 'Martin Lefebvre', dateDebut: '2025-09-01', dateFin: '2026-06-30' },
+      { eleveId: 'benali.sofia.07092010', eleveNom: 'Sofia Benali', dateDebut: '2025-10-01', dateFin: '2026-06-30' },
+    ],
+  },
+  {
+    id: 'proj2', titre: 'Radio Asimov', description: 'Création d\'une émission de radio scolaire diffusée chaque semaine.',
+    dateDebut: '2025-11-01', dateFin: '2026-05-31', statut: 'valide',
+    responsableId: 'benali.sofia.07092010',
+    participants: [
+      { eleveId: 'benali.sofia.07092010', eleveNom: 'Sofia Benali', dateDebut: '2025-11-01', dateFin: '2026-05-31' },
+    ],
+  },
+  {
+    id: 'proj3', titre: 'Exposition Sciences', description: 'Organisation d\'une exposition scientifique ouverte au public.',
+    dateDebut: '2026-03-01', dateFin: '2026-04-30', statut: 'attente',
+    responsableId: null, participants: [],
+  },
+];
+
+let _projetDetailId = null;
+
+function initSecProjets() {
+  const sel = $('proj-responsable');
+  if (sel && sel.options.length === 1) {
+    Object.values(DB.users).filter(u => u.role === 'eleve').forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.id; opt.textContent = `${e.prenom} ${e.nom}`;
+      sel.appendChild(opt);
+    });
+  }
+  renderProjets();
+}
+
+function switchProjetsTab(tab) {
+  ['tous', 'en_cours', 'valide', 'attente'].forEach(t => {
+    const btn = $(`proj-tab-${t}`);
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
+  renderProjets(tab === 'tous' ? null : tab);
+}
+
+function renderProjets(statutFilter = null) {
+  const cont = $('projets-list'); if (!cont) return;
+  let projets = [...SEC_PROJETS];
+  if (statutFilter) projets = projets.filter(p => p.statut === statutFilter);
+
+  const statutColors = { attente: '#F59E0B', valide: '#10B981', en_cours: '#3B82F6' };
+  const statutLabels = { attente: '⏳ En attente de validation', valide: '✓ Validé par la commission', en_cours: '▶ En cours' };
+
+  if (!projets.length) { cont.innerHTML = '<p style="color:#94A3B8;font-size:13px;text-align:center;padding:30px">Aucun projet pour ce filtre</p>'; return; }
+
+  cont.innerHTML = projets.map(p => {
+    const responsable = p.responsableId ? DB.users[p.responsableId] : null;
+    const debut = p.dateDebut ? new Date(p.dateDebut).toLocaleDateString('fr-FR') : '—';
+    const fin = p.dateFin ? new Date(p.dateFin).toLocaleDateString('fr-FR') : '—';
+
+    return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.04)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <h3 style="font-size:16px;font-weight:700;color:#0F172A">${p.titre}</h3>
+            <span style="background:${statutColors[p.statut]}20;color:${statutColors[p.statut]};border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600">${statutLabels[p.statut]}</span>
+          </div>
+          <p style="font-size:13px;color:#475569;margin-bottom:10px">${p.description}</p>
+          <div style="display:flex;gap:16px;font-size:12px;color:#64748B">
+            <span>📅 ${debut} → ${fin}</span>
+            <span>👤 Responsable : ${responsable ? `${responsable.prenom} ${responsable.nom}` : 'Non défini'}</span>
+            <span>🧑‍🎓 ${p.participants.length} participant(s)</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-left:16px">
+          ${p.statut === 'attente' ? `<button onclick="validerProjet('${p.id}')" style="background:#D1FAE5;color:#065F46;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer">✓ Valider</button>` : ''}
+          <button onclick="ouvrirDetailProjet('${p.id}')" class="btn-primary" style="padding:7px 12px;font-size:12px">Détails</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function validerProjet(id) {
+  const p = SEC_PROJETS.find(x => x.id === id);
+  if (p) { p.statut = 'valide'; renderProjets(); }
+}
+
+function ouvrirDetailProjet(id) {
+  _projetDetailId = id;
+  const p = SEC_PROJETS.find(x => x.id === id); if (!p) return;
+  $('detail-proj-titre').textContent = p.titre;
+  $('detail-proj-desc').textContent = p.description;
+  $('detail-proj-debut').textContent = p.dateDebut ? new Date(p.dateDebut).toLocaleDateString('fr-FR') : '—';
+  $('detail-proj-fin').textContent = p.dateFin ? new Date(p.dateFin).toLocaleDateString('fr-FR') : '—';
+  const statutLabels = { attente: '⏳ En attente', valide: '✓ Validé', en_cours: '▶ En cours' };
+  $('detail-proj-statut-badge').textContent = statutLabels[p.statut] || p.statut;
+
+  const partCont = $('detail-proj-participants');
+  partCont.innerHTML = p.participants.length === 0
+    ? '<p style="color:#94A3B8;font-size:13px">Aucun participant</p>'
+    : p.participants.map(pt => {
+      const debut = pt.dateDebut ? new Date(pt.dateDebut).toLocaleDateString('fr-FR') : '—';
+      const fin = pt.dateFin ? new Date(pt.dateFin).toLocaleDateString('fr-FR') : '—';
+      const isResp = p.responsableId === pt.eleveId;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;background:#F8FAFC;border-radius:8px;padding:10px 12px">
+        <div>
+          <span style="font-size:13px;font-weight:600;color:#0F172A">${pt.eleveNom}</span>
+          ${isResp ? '<span style="background:#FEF9C3;color:#854D0E;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;margin-left:6px">RESPONSABLE</span>' : ''}
+          <div style="font-size:11px;color:#94A3B8;margin-top:2px">${debut} → ${fin}</div>
+        </div>
+        <button onclick="retirerParticipantProjet('${id}','${pt.eleveId}')" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:12px;font-weight:600">Retirer</button>
+      </div>`;
+    }).join('');
+
+  const modal = $('modal-detail-projet');
+  if (modal) { modal.classList.remove('hidden'); modal.style.display = 'flex'; }
+}
+
+function closeModalDetailProjet() {
+  const modal = $('modal-detail-projet');
+  if (modal) { modal.classList.add('hidden'); modal.style.display = 'none'; }
+  _projetDetailId = null;
+}
+
+function retirerParticipantProjet(projetId, eleveId) {
+  const p = SEC_PROJETS.find(x => x.id === projetId); if (!p) return;
+  p.participants = p.participants.filter(pt => pt.eleveId !== eleveId);
+  if (p.responsableId === eleveId) p.responsableId = null;
+  ouvrirDetailProjet(projetId);
+}
+
+function openModalAjouterParticipant() {
+  if (!_projetDetailId) return;
+  const p = SEC_PROJETS.find(x => x.id === _projetDetailId); if (!p) return;
+  const deja = p.participants.map(pt => pt.eleveId);
+  const eleves = Object.values(DB.users).filter(u => u.role === 'eleve' && !deja.includes(u.id));
+  if (!eleves.length) { alert('Tous les élèves participent déjà à ce projet.'); return; }
+
+  const eleveChoisi = eleves[0];
+  const confirme = confirm(`Ajouter ${eleveChoisi.prenom} ${eleveChoisi.nom} au projet ? (Pour choisir un autre élève, utilisez la sélection)`);
+  if (!confirme) return;
+  p.participants.push({ eleveId: eleveChoisi.id, eleveNom: `${eleveChoisi.prenom} ${eleveChoisi.nom}`, dateDebut: new Date().toISOString().split('T')[0], dateFin: p.dateFin });
+  ouvrirDetailProjet(_projetDetailId);
+}
+
+function openModalNouveauProjet() {
+  const modal = $('modal-nouveau-projet');
+  if (modal) { modal.classList.remove('hidden'); modal.style.display = 'flex'; }
+}
+
+function closeModalNouveauProjet() {
+  const modal = $('modal-nouveau-projet');
+  if (modal) { modal.classList.add('hidden'); modal.style.display = 'none'; }
+}
+
+function soumettreNouveauProjet() {
+  const titre = $('proj-titre')?.value?.trim();
+  const desc = $('proj-description')?.value?.trim();
+  const debut = $('proj-date-debut')?.value;
+  const fin = $('proj-date-fin')?.value;
+  const responsableId = $('proj-responsable')?.value;
+
+  if (!titre || !desc) { alert('Le titre et la description sont obligatoires.'); return; }
+
+  const newProjet = {
+    id: 'proj' + Date.now(), titre, description: desc,
+    dateDebut: debut || null, dateFin: fin || null,
+    statut: 'attente', responsableId: responsableId || null,
+    participants: responsableId ? [{
+      eleveId: responsableId,
+      eleveNom: (() => { const u = DB.users[responsableId]; return u ? `${u.prenom} ${u.nom}` : ''; })(),
+      dateDebut: debut || null, dateFin: fin || null,
+    }] : [],
+  };
+
+  SEC_PROJETS.unshift(newProjet);
+  closeModalNouveauProjet();
+  ['proj-titre', 'proj-description', 'proj-date-debut', 'proj-date-fin'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+  alert('✅ Projet soumis à la commission du lycée pour validation.');
+  renderProjets();
+}
+
+/* Gestion de l'affichage des nouvelles sections dans showAdminSection */
+const _origShowAdminSection = showAdminSection;
+showAdminSection = function (id, el) {
+  _origShowAdminSection(id, el);
+  if (id === 'sec-moyennes') { initSecMoyennes(); renderMoyennesTable(); }
+  if (id === 'sec-referents') renderReferents();
+  if (id === 'sec-stages') renderStagesSection();
+  if (id === 'sec-projets') renderProjets();
+};
