@@ -4,8 +4,9 @@
   "description": "API REST Collège Asimov V2",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+  "start": "node server.js",
+  "dev": "nodemon server.js",
+  "desktop": "dotnet run --project ../desktop/AsimovENT-Desktop/AsimovENT.csproj"
   },
   "keywords": [],
   "author": "",
