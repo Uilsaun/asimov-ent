@@ -14,9 +14,9 @@
 
    COMPTES DÉMO :
    ── ÉLÈVES ──
-   lefebvre.martin.12032011  / (via Supabase Auth)  (Martin Lefebvre — 4ème B)
-   benali.sofia.07092010     / (via Supabase Auth)  (Sofia Benali — 3ème A)
-   lefebvre.emma.05112013    / (via Supabase Auth)  (Emma Lefebvre — 6ème A)
+   lefebvre.martin.12032011  /  (Martin Lefebvre — 4ème B)
+   benali.sofia.07092010     /  (Sofia Benali — 3ème A)
+   lefebvre.emma.05112013    /  (Emma Lefebvre — 6ème A)
 
    ── PARENTS ──
    parent1      / parent1        (Sophie Lefebvre — Martin & Emma)
@@ -176,7 +176,7 @@ function genEmploi(niveau, classeId) {
 const DB = {
 
   /* ── COMPTES ── */
-  /* ⚠️ Aucun mot de passe ici — auth gérée uniquement par Supabase */
+  /* ⚠️ Aucun mot de passe ici */
   users: {
     /* ── ÉLÈVES — id = nom.prenom.JJMMAAAA ── */
     'lefebvre.martin.12032011': { id: 'lefebvre.martin.12032011', role: 'eleve', prenom: 'Martin', nom: 'Lefebvre', classe: '4ème B', dateNaissance: '12/03/2011', avatar: 'ML', email: 'lefebvre.martin.12032011@asimov.edu', statut: 'actif', regime: 'demi-pensionnaire' },
@@ -691,7 +691,7 @@ const DB = {
 
 /* ════════════════════════════════════════════════════════
    AUTHENTIFICATION
-   ⚠️  Auth déléguée à Supabase — voir supabase.js
+   ⚠️  Auth est délégué aux API backend — voir api.js
    Les fonctions ci-dessous sont gardées pour compatibilité
    avec le reste du code mais ne font plus de vérif de mdp
 ════════════════════════════════════════════════════════ */
@@ -716,7 +716,7 @@ const Auth = {
 
 /* ════════════════════════════════════════════════════════
    DEMANDES DE COMPTE
-   ⚠️  Délégué à SupabaseDB.soumettreDemandeCompte()
+   ⚠️  Délégué aux API backend — voir api.js
    Ce bloc est gardé pour compatibilité uniquement
 ════════════════════════════════════════════════════════ */
 const Demandes = {

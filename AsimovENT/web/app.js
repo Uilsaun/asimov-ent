@@ -104,7 +104,7 @@ async function handleLogin(e) {
   const btn = document.querySelector('#form-login .btn-login');
   if (btn) { btn.disabled = true; btn.textContent = 'Connexion en cours…'; }
 
-  const result = await SupabaseAuth.login(username, password, currentRole);
+  const result = await AsimovAuth.login(username, password, currentRole);
 
   if (btn) { btn.disabled = false; btn.innerHTML = 'Se connecter →'; }
 
@@ -141,7 +141,7 @@ function login(user) {
 }
 
 async function logout() {
-  await SupabaseAuth.logout();
+  await AsimovAuth.logout();
   currentUser = null;
   ['page-eleve', 'page-prof', 'page-principal', 'page-parent'].forEach(hidePage);
   showPage('page-login');
@@ -176,7 +176,7 @@ async function handleDemande(e) {
     errEl.classList.remove('hidden'); return;
   }
 
-  const result = await SupabaseDB.soumettreDemandeCompte(identifiant, pwd1);
+  const result = await AsimovDB.soumettreDemandeCompte(identifiant, pwd1);
 
   if (!result.ok) {
     errMsg.textContent = result.msg;
@@ -3977,9 +3977,63 @@ function updateProfNotifBadge() {
 /* ══════════════════════════════════════════════
    MODALES & TOAST
    ══════════════════════════════════════════════ */
-function openCompose() { $('modal-compose').classList.remove('hidden'); }
-function openComposePro() { $('modal-compose').classList.remove('hidden'); }
+/* ======================================================
+   MESSAGERIE - COMPOSE (modal commune)
+   ====================================================== */
+function _buildDestinatairesOptions() {
+  const tous = Auth.getAll();
+  const roleLabels = { eleve:'Eleve', professeur:'Professeur', principal:'Direction', cpe:'CPE', secretaire:'Secretariat', parent:'Parent' };
+  const role = currentUser?.role;
+  let filtres = tous.filter(u => u.id !== currentUser?.id);
+  if (role === 'eleve') filtres = filtres.filter(u => ['professeur','principal','cpe'].includes(u.role));
+  if (role === 'parent') filtres = filtres.filter(u => ['professeur','principal','cpe','secretaire'].includes(u.role));
+  return filtres.map(u => ({ id: u.id, label: `${u.prenom} ${u.nom} (${roleLabels[u.role] || u.role})` }));
+}
+
+function openCompose() {
+  const modal = $('modal-compose');
+  if (!modal) return;
+  const opts = _buildDestinatairesOptions();
+  const destList = $('compose-dest-list');
+  if (destList) destList.innerHTML = opts.map(o => `<option value="${o.id}">${o.label}</option>`).join('');
+  const destInput = $('compose-dest');
+  if (destInput) { destInput.value = ''; destInput.setAttribute('list', 'compose-dest-list'); }
+  const sujetEl = $('compose-sujet'); if (sujetEl) sujetEl.value = '';
+  const corpsEl = $('compose-corps'); if (corpsEl) corpsEl.value = '';
+  const errEl = $('compose-error'); if (errEl) errEl.classList.add('hidden');
+  modal.classList.remove('hidden');
+}
+function openComposePro() { openCompose(); }
 function closeCompose() { $('modal-compose').classList.add('hidden'); }
+
+async function sendCompose() {
+  const destRaw = $('compose-dest')?.value.trim();
+  const sujet = $('compose-sujet')?.value.trim();
+  const corps = $('compose-corps')?.value.trim();
+  const errEl = $('compose-error');
+  const errMsg = $('compose-error-msg');
+  if (!destRaw || !sujet || !corps) {
+    if (errMsg) errMsg.textContent = 'Tous les champs sont obligatoires.';
+    if (errEl) errEl.classList.remove('hidden'); return;
+  }
+  const opts = _buildDestinatairesOptions();
+  const match = opts.find(o => o.label === destRaw || o.id === destRaw);
+  const destinataireId = match ? match.id : destRaw;
+  const btn = $('compose-send-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Envoi\u2026'; }
+  let result = { ok: false };
+  try { result = await AsimovDB.envoyerMessage(currentUser.id, destinataireId, sujet, corps); } catch(_) {}
+  if (!result.ok) {
+    const now = new Date();
+    const dateStr = `${now.toLocaleDateString('fr-FR')} \u2013 ${now.getHours().toString().padStart(2,'0')}h${now.getMinutes().toString().padStart(2,'0')}`;
+    if (!DB.messages[destinataireId]) DB.messages[destinataireId] = [];
+    DB.messages[destinataireId].unshift({ id: Date.now(), expediteur: `${currentUser.prenom} ${currentUser.nom}`, sujet, corps, date: dateStr, lu: false });
+    result = { ok: true };
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Envoyer'; }
+  if (result.ok) { closeCompose(); showToast('\u2705 Message envoy\u00e9 !'); }
+  else { if (errMsg) errMsg.textContent = result.msg || 'Erreur.'; if (errEl) errEl.classList.remove('hidden'); }
+}
 
 function showToast(msg, duration = 3000) {
   const existing = document.querySelectorAll('.toast-success');
@@ -5205,19 +5259,15 @@ function updateProfNavBadge() {
 
 /* ─── SECRÉTAIRE — RESTRICTIONS ─── */
 function applySecretaireRestrictions() {
-  const allowed = ['admin-accueil', 'admin-comptes', 'admin-messagerie', 'admin-faq-messages',
-    'sec-moyennes', 'sec-referents', 'sec-stages', 'sec-projets'];
+  const allowed = [
+    'admin-accueil', 'admin-comptes', 'admin-messagerie', 'admin-faq-messages',
+    'admin-historique', 'admin-referents', 'admin-stages', 'admin-projets'
+  ];
   document.querySelectorAll('#page-principal .nav-item').forEach(item => {
     const oc = item.getAttribute('onclick') || '';
     item.style.display = allowed.some(a => oc.includes(a)) ? '' : 'none';
   });
-  // Afficher les items secrétariat
-  document.querySelectorAll('.sec-only').forEach(el => el.style.display = '');
-  // Initialiser les sections secrétariat
-  initSecMoyennes();
-  initSecReferents();
-  initSecStages();
-  initSecProjets();
+  document.querySelectorAll('.secretaire-only').forEach(el => el.style.display = '');
 }
 
 /* ─── CPE PLANNING PROFS ─── */
@@ -5540,659 +5590,712 @@ async function renderStatsDirection() {
 
 
 
-
 /* ══════════════════════════════════════════════════════════════
-   SECRÉTARIAT — MOYENNES SEMESTRIELLES
+   SECRÉTARIAT — MODULE COMPLET (Cahier des charges A.4)
    ══════════════════════════════════════════════════════════════ */
 
-// Stockage local des moyennes saisies (en production → DB via API)
-const SEC_MOYENNES = {}; // { "6A_S1": { "lefebvre.martin.12032011": { moy: 14.5, statut: 'en_attente' } } }
+/* ────────────────────────────────────────────────────────────
+   1. HISTORIQUE SCOLAIRE — Moyennes par semestre
+   ──────────────────────────────────────────────────────────── */
 
-function initSecMoyennes() {
-  const sel = $('sec-moy-classe-select');
-  if (!sel || sel.options.length > 1) return;
-  Object.keys(DB.classes).forEach(code => {
-    const opt = document.createElement('option');
-    opt.value = code; opt.textContent = DB.classes[code].nom;
-    sel.appendChild(opt);
-  });
+/* Stockage local (en attendant les routes API) */
+const HISTORIQUE_SCOLAIRE = {
+  /* Exemple : { eleveId: [ { id, semestre, annee, moyenne, matieres:[], statut:'brouillon'|'valide', validePar, dateValidation } ] } */
+};
+
+const MATIERES_LISTE = [
+  'Mathématiques','Français','Histoire-Géo','SVT','Anglais',
+  'Physique-Chimie','Espagnol LV2','EPS','Arts Plastiques','Musique','Technologie','Latin'
+];
+
+function getAnneeCourante() {
+  const now = new Date();
+  const m = now.getMonth() + 1;
+  const y = now.getFullYear();
+  return m >= 9 ? `${y}-${y+1}` : `${y-1}-${y}`;
 }
 
-function renderMoyennesTable() {
-  const classe = $('sec-moy-classe-select')?.value;
-  const semestre = $('sec-moy-semestre-select')?.value || 'S1';
-  const cont = $('sec-moyennes-container');
-  if (!cont) return;
+/* ─── INIT SECTION HISTORIQUE ─── */
+function initSecretariatHistorique() {
+  const sel = $('hist-eleve-select');
+  if (!sel) return;
+  const eleves = Auth.getAll().filter(u => u.role === 'eleve').sort((a,b) => a.nom.localeCompare(b.nom,'fr'));
+  sel.innerHTML = '<option value="">— Choisir un élève —</option>' +
+    eleves.map(e => `<option value="${e.id}">${e.nom} ${e.prenom} — ${e.classe || '?'}</option>`).join('');
+  renderHistoriqueEleve();
+}
 
-  if (!classe) {
-    cont.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:40px;font-size:13px">Sélectionnez une classe et un semestre</p>';
+function renderHistoriqueEleve() {
+  const eleveId = $('hist-eleve-select')?.value;
+  const container = $('hist-semestres-list');
+  if (!container) return;
+  if (!eleveId) {
+    container.innerHTML = '<p style="color:#94A3B8;text-align:center;padding:40px;font-size:13px">Sélectionnez un élève pour voir son historique scolaire.</p>';
     return;
   }
+  const semestres = HISTORIQUE_SCOLAIRE[eleveId] || [];
+  const eleve = Auth.getAll().find(u => u.id === eleveId);
+  const anneeCourante = getAnneeCourante();
 
-  const key = `${classe}_${semestre}`;
-  if (!SEC_MOYENNES[key]) SEC_MOYENNES[key] = {};
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <div>
+      <div style="font-size:15px;font-weight:700;color:#0F172A">${eleve ? eleve.prenom + ' ' + eleve.nom : eleveId}</div>
+      <div style="font-size:12px;color:#64748B">${eleve?.classe || '—'} · Année ${anneeCourante}</div>
+    </div>
+    <button onclick="ouvrirSaisieMoyenne('${eleveId}')"
+      style="background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">
+      + Saisir une moyenne
+    </button>
+  </div>`;
 
-  const eleves = DB.classes[classe]?.eleves || [];
+  if (!semestres.length) {
+    html += '<div style="background:#F8FAFC;border-radius:12px;border:2px dashed #E2E8F0;padding:40px;text-align:center;color:#94A3B8;font-size:13px">Aucune moyenne saisie pour cet élève.</div>';
+  } else {
+    // Grouper par année scolaire
+    const parAnnee = {};
+    semestres.forEach(s => {
+      if (!parAnnee[s.annee]) parAnnee[s.annee] = [];
+      parAnnee[s.annee].push(s);
+    });
+    Object.keys(parAnnee).sort().reverse().forEach(annee => {
+      html += `<div style="margin-bottom:20px">
+        <div style="font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📅 Année ${annee}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">`;
+      parAnnee[annee].forEach(s => {
+        const isValide = s.statut === 'valide';
+        const canEdit = s.statut === 'brouillon' && currentUser?.role === 'secretaire';
+        const canValider = s.statut === 'brouillon' && currentUser?.role === 'principal';
+        html += `
+          <div style="background:#fff;border-radius:12px;border:1.5px solid ${isValide ? '#BBF7D0' : '#E2E8F0'};padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.04)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div>
+                <div style="font-weight:700;font-size:14px;color:#0F172A">Semestre ${s.semestre}</div>
+                <div style="font-size:11px;color:#64748B;margin-top:2px">${s.saisieDate || '—'}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:22px;font-weight:800;color:${isValide ? '#16A34A' : '#2563EB'}">${s.moyenne}<span style="font-size:11px;font-weight:400;color:#94A3B8">/20</span></span>
+              </div>
+            </div>
+            ${s.matieres && s.matieres.length ? `
+            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">
+              ${s.matieres.map(m => {
+                const col = getMatiereColor(m.nom);
+                return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:${col.bg};border-radius:6px">
+                  <span style="font-size:11px;font-weight:600;color:${col.text};flex:1">${m.nom}</span>
+                  <span style="font-size:13px;font-weight:700;color:${col.text}">${m.note}/20</span>
+                </div>`;
+              }).join('')}
+            </div>` : ''}
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+              <span style="background:${isValide ? '#DCFCE7' : '#FEF3C7'};color:${isValide ? '#15803D' : '#92400E'};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">
+                ${isValide ? '✅ Validé par ' + (s.validePar || 'le proviseur') : '⏳ En attente de validation'}
+              </span>
+              ${canEdit ? `<button onclick="ouvrirSaisieMoyenne('${eleveId}','${s.id}')" style="background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">✏️ Modifier</button>` : ''}
+              ${canValider ? `<button onclick="validerMoyenne('${eleveId}','${s.id}')" style="background:#DCFCE7;color:#15803D;border:1px solid #BBF7D0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">✅ Valider</button>` : ''}
+            </div>
+          </div>`;
+      });
+      html += '</div></div>';
+    });
+  }
+  container.innerHTML = html;
+}
+
+function ouvrirSaisieMoyenne(eleveId, editId) {
+  const eleve = Auth.getAll().find(u => u.id === eleveId);
+  const existing = document.getElementById('modal-saisie-moyenne');
+  if (existing) existing.remove();
+  const semestresExistants = HISTORIQUE_SCOLAIRE[eleveId] || [];
+  const editData = editId ? semestresExistants.find(s => s.id === editId) : null;
+  const anneeCourante = getAnneeCourante();
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-saisie-moyenne';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(4px)';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;width:min(600px,96vw);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.3);overflow:hidden">
+      <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;background:#1E3A8A;color:#fff">
+        <div>
+          <div style="font-weight:700;font-size:15px">${editId ? '✏️ Modifier la moyenne' : '+ Saisir une moyenne'}</div>
+          <div style="font-size:12px;opacity:.8">${eleve ? eleve.prenom + ' ' + eleve.nom : eleveId}</div>
+        </div>
+        <button onclick="document.getElementById('modal-saisie-moyenne').remove()" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;width:30px;height:30px;color:#fff;cursor:pointer;font-size:16px">✕</button>
+      </div>
+      <div style="overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Semestre</label>
+            <select id="sm-semestre" style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px" ${editId && !editData?.statut !== 'valide' ? '' : ''}>
+              <option value="1" ${editData?.semestre === 1 ? 'selected' : ''}>Semestre 1</option>
+              <option value="2" ${editData?.semestre === 2 ? 'selected' : ''}>Semestre 2</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Année scolaire</label>
+            <input type="text" id="sm-annee" value="${editData?.annee || anneeCourante}"
+              style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px" placeholder="ex: 2025-2026"/>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Moyenne générale /20</label>
+          <input type="number" id="sm-moyenne" min="0" max="20" step="0.01" value="${editData?.moyenne || ''}"
+            style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px" placeholder="ex: 13.5"/>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:8px">Notes par matière <span style="font-weight:400;color:#94A3B8">(optionnel)</span></label>
+          <div id="sm-matieres-list" style="display:flex;flex-direction:column;gap:6px">
+            ${MATIERES_LISTE.map(m => {
+              const existing = editData?.matieres?.find(x => x.nom === m);
+              return `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:#F8FAFC;border-radius:8px;border:1px solid #E2E8F0">
+                <span style="font-size:12px;font-weight:600;color:#374151;flex:1">${m}</span>
+                <input type="number" min="0" max="20" step="0.01" value="${existing ? existing.note : ''}"
+                  data-matiere="${m}" class="sm-note-input"
+                  style="width:80px;padding:5px 8px;border:1.5px solid #E2E8F0;border-radius:6px;font-family:'Sora',sans-serif;font-size:13px;text-align:center"
+                  placeholder="—"/>
+                <span style="font-size:11px;color:#94A3B8">/20</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+      <div style="padding:16px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:8px">
+        <button onclick="document.getElementById('modal-saisie-moyenne').remove()" style="padding:9px 18px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;font-family:'Sora',sans-serif">Annuler</button>
+        <button onclick="sauvegarderMoyenne('${eleveId}','${editId || ''}')" style="padding:9px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff;cursor:pointer;font-family:'Sora',sans-serif;font-weight:600">💾 Enregistrer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function sauvegarderMoyenne(eleveId, editId) {
+  const semestre = parseInt($('sm-semestre')?.value) || 1;
+  const annee = $('sm-annee')?.value.trim();
+  const moyenneVal = parseFloat($('sm-moyenne')?.value);
+  if (isNaN(moyenneVal) || moyenneVal < 0 || moyenneVal > 20) {
+    showToast('⚠️ La moyenne doit être entre 0 et 20'); return;
+  }
+  if (!annee) { showToast('⚠️ Indiquez l\'année scolaire'); return; }
+
+  // Récupérer les notes par matière
+  const matieres = [];
+  document.querySelectorAll('.sm-note-input').forEach(inp => {
+    const val = parseFloat(inp.value);
+    if (!isNaN(val)) matieres.push({ nom: inp.getAttribute('data-matiere'), note: val });
+  });
+
+  if (!HISTORIQUE_SCOLAIRE[eleveId]) HISTORIQUE_SCOLAIRE[eleveId] = [];
+  const saisieDate = new Date().toLocaleDateString('fr-FR');
+  if (editId) {
+    const idx = HISTORIQUE_SCOLAIRE[eleveId].findIndex(s => s.id === editId);
+    if (idx !== -1) {
+      HISTORIQUE_SCOLAIRE[eleveId][idx] = {
+        ...HISTORIQUE_SCOLAIRE[eleveId][idx],
+        semestre, annee, moyenne: moyenneVal, matieres, saisieDate,
+        statut: 'brouillon', // retour en brouillon après modification
+      };
+      showToast('✅ Moyenne modifiée — En attente de validation du proviseur');
+    }
+  } else {
+    // Vérifier pas de doublon semestre/année
+    const doublon = HISTORIQUE_SCOLAIRE[eleveId].find(s => s.semestre === semestre && s.annee === annee);
+    if (doublon) { showToast('⚠️ Une moyenne existe déjà pour ce semestre/année'); return; }
+    HISTORIQUE_SCOLAIRE[eleveId].unshift({
+      id: `hist-${eleveId}-${Date.now()}`,
+      semestre, annee, moyenne: moyenneVal, matieres, saisieDate,
+      statut: 'brouillon', saisieParId: currentUser?.id,
+    });
+    showToast('✅ Moyenne enregistrée — En attente de validation du proviseur');
+  }
+  document.getElementById('modal-saisie-moyenne')?.remove();
+  renderHistoriqueEleve();
+}
+
+function validerMoyenne(eleveId, histId) {
+  const sem = (HISTORIQUE_SCOLAIRE[eleveId] || []).find(s => s.id === histId);
+  if (!sem) return;
+  if (currentUser?.role !== 'principal') { showToast('⛔ Seul le proviseur peut valider une moyenne'); return; }
+  sem.statut = 'valide';
+  sem.validePar = `${currentUser.prenom} ${currentUser.nom}`;
+  sem.dateValidation = new Date().toLocaleDateString('fr-FR');
+  renderHistoriqueEleve();
+  showToast('✅ Moyenne validée et verrouillée');
+}
+
+/* ────────────────────────────────────────────────────────────
+   2. PROFESSEURS RÉFÉRENTS
+   ──────────────────────────────────────────────────────────── */
+
+/* Structure : { eleveId: profId } */
+const REFERENTS_MAP = {};
+
+function initSecretariatReferents() {
+  renderReferentsTable();
+}
+
+function renderReferentsTable() {
+  const container = $('referents-table-body');
+  if (!container) return;
+  const eleves = Auth.getAll().filter(u => u.role === 'eleve').sort((a,b) => {
+    if (a.classe !== b.classe) return (a.classe || '').localeCompare(b.classe || '');
+    return a.nom.localeCompare(b.nom, 'fr');
+  });
+  const profs = Auth.getAll().filter(u => u.role === 'professeur');
+
   if (!eleves.length) {
-    cont.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:40px;font-size:13px">Aucun élève dans cette classe</p>';
+    container.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:30px;font-size:13px">Aucun élève trouvé</td></tr>';
     return;
   }
 
-  const isSecretaire = currentUser?.role === 'secretaire';
-  const isProviseur = currentUser?.role === 'principal';
-
-  const rows = eleves.map(e => {
-    const userId = Object.keys(DB.users).find(id => {
-      const u = DB.users[id];
-      return u.prenom === e.prenom && u.nom === e.nom;
-    }) || e.prenom.toLowerCase();
-
-    const entry = SEC_MOYENNES[key][userId] || { moy: '', statut: 'non_saisie' };
-    const statutColor = { non_saisie: '#94A3B8', en_attente: '#F59E0B', valide: '#10B981', corrige: '#3B82F6' };
-    const statutLabel = { non_saisie: '—', en_attente: 'En attente', valide: '✓ Validée', corrige: '✏ Corrigée' };
-
-    const canEdit = isSecretaire && entry.statut === 'non_saisie';
-    const canValidate = isProviseur && entry.statut === 'en_attente';
-    const canCorrect = isProviseur && (entry.statut === 'en_attente' || entry.statut === 'valide');
-
+  container.innerHTML = eleves.map(e => {
+    const refId = REFERENTS_MAP[e.id];
+    const ref = refId ? profs.find(p => p.id === refId) : null;
     return `<tr style="border-bottom:1px solid #F1F5F9">
-      <td style="padding:12px 16px;font-weight:600;color:#0F172A;font-size:13px">${e.prenom} ${e.nom}</td>
-      <td style="padding:12px 16px;font-size:13px;color:#475569">${DB.classes[classe]?.nom || classe}</td>
-      <td style="padding:12px 16px">
-        ${canEdit
-        ? `<input type="number" min="0" max="20" step="0.01" value="${entry.moy}"
-               style="width:80px;padding:6px 10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;font-family:inherit"
-               id="moy-input-${userId}" placeholder="—" />`
-        : `<span style="font-weight:700;font-size:14px;color:${entry.moy !== '' ? '#0F172A' : '#94A3B8'}">${entry.moy !== '' ? entry.moy + '/20' : '—'}</span>`
-      }
+      <td style="padding:10px 14px">
+        <div style="font-weight:600;font-size:13px;color:#0F172A">${e.prenom} ${e.nom}</div>
+        <div style="font-size:11px;color:#64748B">${e.classe || '—'}</div>
       </td>
-      <td style="padding:12px 16px">
-        <span style="font-size:12px;font-weight:600;color:${statutColor[entry.statut] || '#94A3B8'}">${statutLabel[entry.statut] || '—'}</span>
+      <td style="padding:10px 14px;font-size:12px;color:#64748B">${e.id}</td>
+      <td style="padding:10px 14px">
+        ${ref ? `<div style="display:flex;align-items:center;gap:8px">
+          <div style="width:28px;height:28px;border-radius:8px;background:#EFF6FF;border:1.5px solid #BFDBFE;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#2563EB">${ref.prenom[0]}${ref.nom[0]}</div>
+          <div><div style="font-size:12px;font-weight:600;color:#0F172A">${ref.prenom} ${ref.nom}</div><div style="font-size:10px;color:#64748B">${ref.matiere || ''}</div></div>
+        </div>`
+        : '<span style="color:#94A3B8;font-size:12px;font-style:italic">Non affecté</span>'}
       </td>
-      <td style="padding:12px 16px">
-        ${canEdit
-        ? `<button onclick="saisirMoyenne('${key}','${userId}')" class="btn-primary" style="padding:6px 12px;font-size:12px">Enregistrer</button>`
-        : ''
-      }
-        ${canValidate
-        ? `<button onclick="validerMoyenne('${key}','${userId}')" style="background:#D1FAE5;color:#065F46;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer;margin-right:6px">Valider</button>`
-        : ''
-      }
-        ${canCorrect
-        ? `<button onclick="corrigerMoyenne('${key}','${userId}')" style="background:#DBEAFE;color:#1E40AF;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer">Corriger</button>`
-        : ''
-      }
+      <td style="padding:10px 14px">
+        <select onchange="affecterReferent('${e.id}', this.value)"
+          style="padding:5px 8px;border:1.5px solid #E2E8F0;border-radius:7px;font-family:'Sora',sans-serif;font-size:12px;background:#fff;cursor:pointer">
+          <option value="">— Choisir —</option>
+          ${profs.map(p => `<option value="${p.id}" ${refId === p.id ? 'selected' : ''}>${p.prenom} ${p.nom} (${p.matiere || '?'})</option>`).join('')}
+        </select>
       </td>
     </tr>`;
   }).join('');
-
-  cont.innerHTML = `
-    <div style="background:#fff;border-radius:14px;border:1px solid #E2E8F0;overflow:hidden">
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr style="background:#F8FAFC">
-            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Élève</th>
-            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Classe</th>
-            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Moyenne ${semestre}</th>
-            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Statut</th>
-            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Action</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    ${isSecretaire ? `<div style="text-align:right;margin-top:12px"><button class="btn-primary" onclick="saisirToutesMoyennes('${key}','${classe}')">Enregistrer toutes les moyennes</button></div>` : ''}
-  `;
 }
 
-function saisirMoyenne(key, userId) {
-  const input = $(`moy-input-${userId}`);
-  const val = parseFloat(input?.value);
-  if (isNaN(val) || val < 0 || val > 20) { alert('Veuillez saisir une note entre 0 et 20.'); return; }
-  if (!SEC_MOYENNES[key]) SEC_MOYENNES[key] = {};
-  SEC_MOYENNES[key][userId] = { moy: val, statut: 'en_attente', saisiPar: currentUser?.id, saisiLe: new Date().toLocaleDateString('fr-FR') };
-  renderMoyennesTable();
+function affecterReferent(eleveId, profId) {
+  if (profId) {
+    REFERENTS_MAP[eleveId] = profId;
+    const prof = Auth.getAll().find(p => p.id === profId);
+    showToast(`✅ Référent affecté : ${prof?.prenom} ${prof?.nom}`);
+  } else {
+    delete REFERENTS_MAP[eleveId];
+  }
+  renderReferentsTable();
 }
 
-function saisirToutesMoyennes(key, classe) {
-  const eleves = DB.classes[classe]?.eleves || [];
-  let count = 0;
+function affecterRoundRobin() {
+  const eleves = Auth.getAll().filter(u => u.role === 'eleve');
+  const profs = Auth.getAll().filter(u => u.role === 'professeur');
+  if (!profs.length) { showToast('⚠️ Aucun professeur disponible'); return; }
+  let idx = 0;
   eleves.forEach(e => {
-    const userId = Object.keys(DB.users).find(id => {
-      const u = DB.users[id]; return u.prenom === e.prenom && u.nom === e.nom;
-    }) || e.prenom.toLowerCase();
-    const input = $(`moy-input-${userId}`);
-    if (!input) return;
-    const val = parseFloat(input.value);
-    if (!isNaN(val) && val >= 0 && val <= 20) {
-      if (!SEC_MOYENNES[key]) SEC_MOYENNES[key] = {};
-      if (!SEC_MOYENNES[key][userId] || SEC_MOYENNES[key][userId].statut === 'non_saisie') {
-        SEC_MOYENNES[key][userId] = { moy: val, statut: 'en_attente', saisiPar: currentUser?.id, saisiLe: new Date().toLocaleDateString('fr-FR') };
-        count++;
-      }
+    if (!REFERENTS_MAP[e.id]) {
+      REFERENTS_MAP[e.id] = profs[idx % profs.length].id;
+      idx++;
     }
   });
-  if (count > 0) { alert(`${count} moyenne(s) enregistrée(s). En attente de validation par le proviseur.`); renderMoyennesTable(); }
-  else alert('Aucune nouvelle moyenne à enregistrer.');
+  renderReferentsTable();
+  showToast(`✅ Round-robin effectué — ${idx} élèves affectés`);
 }
 
-function validerMoyenne(key, userId) {
-  if (SEC_MOYENNES[key]?.[userId]) {
-    SEC_MOYENNES[key][userId].statut = 'valide';
-    SEC_MOYENNES[key][userId].validePar = currentUser?.id;
-    SEC_MOYENNES[key][userId].valideLE = new Date().toLocaleDateString('fr-FR');
-    renderMoyennesTable();
+/* Afficher le référent côté élève/prof */
+function getReferentDeEleve(eleveId) {
+  const profId = REFERENTS_MAP[eleveId];
+  if (!profId) return null;
+  return Auth.getAll().find(u => u.id === profId) || null;
+}
+function getElevesReferentPour(profId) {
+  return Auth.getAll().filter(u => u.role === 'eleve' && REFERENTS_MAP[u.id] === profId);
+}
+
+/* ────────────────────────────────────────────────────────────
+   3. STAGES ÉLÈVES
+   ──────────────────────────────────────────────────────────── */
+
+const STAGES_DATA = {};
+/* Structure stage : { id, eleveId, statut:'recherche'|'convention'|'attestation',
+    entreprise, contactNom, contactEmail, contactTel,
+    lettresEnvoyees, lettresRecues, entretiens:[{date,resultat}],
+    convention:{ dateDebut, dateFin, signe:bool }, attestation:{ recu:bool, dateSig } } */
+
+function initSecretariatStages() {
+  const sel = $('stages-eleve-select');
+  if (!sel) return;
+  const eleves = Auth.getAll().filter(u => u.role === 'eleve').sort((a,b) => a.nom.localeCompare(b.nom,'fr'));
+  sel.innerHTML = '<option value="">— Choisir un élève —</option>' +
+    eleves.map(e => `<option value="${e.id}">${e.nom} ${e.prenom} — ${e.classe || '?'}</option>`).join('');
+  renderStagesEleve();
+}
+
+function renderStagesEleve() {
+  const eleveId = $('stages-eleve-select')?.value;
+  const container = $('stages-list');
+  if (!container) return;
+  if (!eleveId) {
+    container.innerHTML = '<p style="color:#94A3B8;text-align:center;padding:40px;font-size:13px">Sélectionnez un élève pour voir ses stages.</p>';
+    return;
   }
-}
+  const stages = STAGES_DATA[eleveId] || [];
+  const eleve = Auth.getAll().find(u => u.id === eleveId);
+  const statusLabels = { recherche:'🔍 En recherche', convention:'📝 Convention', attestation:'🎓 Terminé' };
+  const statusColors = { recherche:'#FEF3C7,#D97706', convention:'#DBEAFE,#2563EB', attestation:'#DCFCE7,#16A34A' };
 
-function corrigerMoyenne(key, userId) {
-  const nouvelleNote = prompt('Saisir la note corrigée (0-20) :');
-  const val = parseFloat(nouvelleNote);
-  if (isNaN(val) || val < 0 || val > 20) { alert('Note invalide.'); return; }
-  if (SEC_MOYENNES[key]?.[userId]) {
-    SEC_MOYENNES[key][userId].moy = val;
-    SEC_MOYENNES[key][userId].statut = 'corrige';
-    SEC_MOYENNES[key][userId].corrigePar = currentUser?.id;
-    SEC_MOYENNES[key][userId].corrigeLE = new Date().toLocaleDateString('fr-FR');
-    renderMoyennesTable();
-  }
-}
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <div style="font-size:14px;font-weight:700;color:#0F172A">${eleve ? eleve.prenom + ' ' + eleve.nom : eleveId} — Suivi des stages</div>
+    <button onclick="ouvrirModalStage('${eleveId}',null)"
+      style="background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;cursor:pointer">
+      + Nouveau stage
+    </button>
+  </div>`;
 
-/* ══════════════════════════════════════════════════════════════
-   SECRÉTARIAT — ENSEIGNANTS RÉFÉRENTS
-   ══════════════════════════════════════════════════════════════ */
-
-// { eleveId: profId }
-const REFERENTS = {};
-let _referentEleveEnCours = null;
-
-function initSecReferents() {
-  renderReferents();
-}
-
-function renderReferents() {
-  const contProfs = $('referents-par-prof');
-  const contSans = $('eleves-sans-referent');
-  const badge = $('badge-sans-referent');
-  if (!contProfs || !contSans) return;
-
-  const profs = Object.values(DB.users).filter(u => u.role === 'professeur');
-  const eleves = Object.values(DB.users).filter(u => u.role === 'eleve');
-
-  // Par prof
-  contProfs.innerHTML = profs.map(prof => {
-    const mesEleves = eleves.filter(e => REFERENTS[e.id] === prof.id);
-    return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:${mesEleves.length ? 10 : 0}px">
-        <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#10B981,#059669);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff">${prof.prenom[0]}${prof.nom[0]}</div>
-        <div>
-          <div style="font-weight:700;font-size:13px;color:#0F172A">${prof.prenom} ${prof.nom}</div>
-          <div style="font-size:11px;color:#64748B">${prof.matiere || 'Professeur'} · ${mesEleves.length} élève(s) référent${mesEleves.length > 1 ? 's' : ''}</div>
-        </div>
-      </div>
-      ${mesEleves.map(e => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#F8FAFC;border-radius:8px;margin-bottom:4px">
-          <span style="font-size:12px;color:#475569">${e.prenom} ${e.nom} <span style="color:#94A3B8">${e.classe || ''}</span></span>
-          <button onclick="retirerReferent('${e.id}')" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:11px;font-weight:600">Retirer</button>
-        </div>
-      `).join('')}
-    </div>`;
-  }).join('');
-
-  // Sans référent
-  const sansRef = eleves.filter(e => !REFERENTS[e.id]);
-  if (badge) { badge.textContent = sansRef.length; badge.style.display = sansRef.length ? '' : 'none'; }
-
-  const navBadge = $('badge-referents-nav');
-  if (navBadge) { navBadge.textContent = sansRef.length; navBadge.style.display = sansRef.length > 0 ? '' : 'none'; }
-
-  contSans.innerHTML = sansRef.length === 0
-    ? '<p style="color:#10B981;font-size:13px;text-align:center;padding:20px">✅ Tous les élèves ont un référent</p>'
-    : sansRef.map(e => `
-      <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #FED7AA;border-radius:10px;padding:12px 14px">
-        <div>
-          <div style="font-weight:600;font-size:13px;color:#0F172A">${e.prenom} ${e.nom}</div>
-          <div style="font-size:11px;color:#94A3B8">${e.classe || ''}</div>
-        </div>
-        <button onclick="openModalReferent('${e.id}')" class="btn-primary" style="padding:6px 12px;font-size:12px">Affecter</button>
-      </div>
-    `).join('');
-}
-
-function openModalReferent(eleveId) {
-  _referentEleveEnCours = eleveId;
-  const eleve = DB.users[eleveId];
-  const nomEl = $('modal-referent-eleve-nom');
-  if (nomEl && eleve) nomEl.textContent = `Élève : ${eleve.prenom} ${eleve.nom}`;
-
-  const sel = $('modal-referent-prof-select');
-  if (sel) {
-    const profs = Object.values(DB.users).filter(u => u.role === 'professeur');
-    sel.innerHTML = '<option value="">— Choisir un professeur —</option>'
-      + profs.map(p => `<option value="${p.id}">${p.prenom} ${p.nom} — ${p.matiere || ''}</option>`).join('');
-  }
-  const modal = $('modal-affecter-referent');
-  if (modal) { modal.classList.remove('hidden'); modal.style.display = 'flex'; }
-}
-
-function closeModalReferent() {
-  const modal = $('modal-affecter-referent');
-  if (modal) { modal.classList.add('hidden'); modal.style.display = 'none'; }
-  _referentEleveEnCours = null;
-}
-
-function confirmerAffectationReferent() {
-  const profId = $('modal-referent-prof-select')?.value;
-  if (!profId || !_referentEleveEnCours) { alert('Veuillez choisir un professeur.'); return; }
-  REFERENTS[_referentEleveEnCours] = profId;
-  closeModalReferent();
-  renderReferents();
-}
-
-function retirerReferent(eleveId) {
-  if (!confirm('Retirer ce référent ?')) return;
-  delete REFERENTS[eleveId];
-  renderReferents();
-}
-
-function affectationRoundRobin() {
-  const profs = Object.values(DB.users).filter(u => u.role === 'professeur');
-  const elevesNonAffectes = Object.values(DB.users).filter(u => u.role === 'eleve' && !REFERENTS[u.id]);
-  if (!profs.length) { alert('Aucun professeur disponible.'); return; }
-  if (!elevesNonAffectes.length) { alert('Tous les élèves ont déjà un référent.'); return; }
-
-  // Compter les élèves actuels par prof pour équilibrer
-  const comptes = {};
-  profs.forEach(p => { comptes[p.id] = Object.values(REFERENTS).filter(v => v === p.id).length; });
-
-  elevesNonAffectes.forEach(eleve => {
-    // Prend le prof avec le moins d'élèves
-    const profMin = profs.reduce((a, b) => comptes[a.id] <= comptes[b.id] ? a : b);
-    REFERENTS[eleve.id] = profMin.id;
-    comptes[profMin.id]++;
-  });
-
-  alert(`✅ ${elevesNonAffectes.length} élève(s) affecté(s) automatiquement.`);
-  renderReferents();
-}
-
-/* ══════════════════════════════════════════════════════════════
-   SECRÉTARIAT — STAGES
-   ══════════════════════════════════════════════════════════════ */
-
-const SEC_STAGES = [
-  {
-    id: 'stg1', eleveId: 'lefebvre.martin.12032011', eleveNom: 'Martin Lefebvre', classe: '4ème B',
-    statut: 'recherche',
-    recherches: [
-      { entreprise: 'Société Informatique Grenoble', contact: 'M. Durand', tel: '04 76 00 11 22', lettresEnvoyees: 3, lettresRecues: 1, entretiens: [{ date: '15/03/2025', resultat: 'En attente' }] },
-      { entreprise: 'Web & Co', contact: 'Mme Martin', tel: '06 12 34 56 78', lettresEnvoyees: 1, lettresRecues: 0, entretiens: [] },
-    ],
-    convention: null, attestation: null,
-  },
-  {
-    id: 'stg2', eleveId: 'benali.sofia.07092010', eleveNom: 'Sofia Benali', classe: '3ème A',
-    statut: 'convention_validee',
-    recherches: [
-      { entreprise: 'Cabinet Médical Alpin', contact: 'Dr. Rousseau', tel: '04 76 55 44 33', lettresEnvoyees: 2, lettresRecues: 2, entretiens: [{ date: '10/02/2025', resultat: 'Accepté' }] },
-    ],
-    convention: { entreprise: 'Cabinet Médical Alpin', dateDebut: '02/06/2025', dateFin: '13/06/2025', tuteur: 'Dr. Rousseau', valide: true, valideParReferent: true },
-    attestation: null,
-  },
-  {
-    id: 'stg3', eleveId: 'lefebvre.emma.05112013', eleveNom: 'Emma Lefebvre', classe: '6ème A',
-    statut: 'atteste',
-    recherches: [
-      { entreprise: 'École Maternelle Les Lutins', contact: 'Mme Bernard', tel: '04 76 22 11 00', lettresEnvoyees: 1, lettresRecues: 1, entretiens: [{ date: '05/01/2025', resultat: 'Accepté' }] },
-    ],
-    convention: { entreprise: 'École Maternelle Les Lutins', dateDebut: '20/01/2025', dateFin: '31/01/2025', tuteur: 'Mme Bernard', valide: true, valideParReferent: true },
-    attestation: { signee: true, dateSignature: '01/02/2025', commentaire: 'Excellent stage, élève très motivée.' },
-  },
-];
-
-function initSecStages() {
-  // Remplir les filtres de classe
-  const sel = $('sec-stages-classe-filter');
-  if (sel && sel.options.length === 1) {
-    Object.keys(DB.classes).forEach(code => {
-      const opt = document.createElement('option');
-      opt.value = code; opt.textContent = DB.classes[code].nom;
-      sel.appendChild(opt);
-    });
-  }
-  renderStagesSection();
-}
-
-function switchStagesTab(tab) {
-  ['recherches', 'conventions', 'attestations'].forEach(t => {
-    const btn = $(`stages-tab-${t}`); const panel = $(`stages-panel-${t}`);
-    if (btn) btn.classList.toggle('active', t === tab);
-    if (panel) panel.style.display = t === tab ? '' : 'none';
-  });
-}
-
-function renderStagesSection() {
-  const classeFilter = $('sec-stages-classe-filter')?.value;
-  const statutFilter = $('sec-stages-statut-filter')?.value;
-
-  let stages = [...SEC_STAGES];
-  if (classeFilter) stages = stages.filter(s => {
-    const u = DB.users[s.eleveId]; return u?.classe?.includes(DB.classes[classeFilter]?.nom?.replace('ème', '').trim()) || false;
-  });
-  if (statutFilter) stages = stages.filter(s => s.statut === statutFilter);
-
-  renderRecherchesList(stages);
-  renderConventionsList(stages);
-  renderAttestationsList(stages);
-}
-
-function renderRecherchesList(stages) {
-  const cont = $('stages-recherches-list'); if (!cont) return;
-  if (!stages.length) { cont.innerHTML = '<p style="color:#94A3B8;font-size:13px;text-align:center;padding:20px">Aucun stage trouvé</p>'; return; }
-
-  cont.innerHTML = stages.map(s => {
-    const totalLettres = s.recherches.reduce((t, r) => t + r.lettresEnvoyees, 0);
-    const totalRecues = s.recherches.reduce((t, r) => t + r.lettresRecues, 0);
-    const totalEntretiens = s.recherches.reduce((t, r) => t + r.entretiens.length, 0);
-    const statutColors = { recherche: '#F59E0B', convention_en_attente: '#3B82F6', convention_validee: '#10B981', stage_en_cours: '#8B5CF6', atteste: '#059669' };
-    const statutLabels = { recherche: 'En recherche', convention_en_attente: 'Convention en attente', convention_validee: 'Convention validée', stage_en_cours: 'Stage en cours', atteste: 'Attesté' };
-
-    return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px;box-shadow:0 2px 8px rgba(0,0,0,.04)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#3B82F6,#1E3A8A);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff">${s.eleveNom.split(' ').map(n => n[0]).join('')}</div>
-          <div>
-            <div style="font-weight:700;font-size:14px;color:#0F172A">${s.eleveNom}</div>
-            <div style="font-size:12px;color:#64748B">${s.classe}</div>
+  if (!stages.length) {
+    html += '<div style="background:#F8FAFC;border-radius:12px;border:2px dashed #E2E8F0;padding:40px;text-align:center;color:#94A3B8;font-size:13px">Aucun stage enregistré.</div>';
+  } else {
+    html += stages.map(s => {
+      const [sbg, scol] = (statusColors[s.statut] || '#F1F5F9,#64748B').split(',');
+      return `<div style="background:#fff;border-radius:12px;border:1.5px solid #E2E8F0;padding:18px 20px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.04)">
+        <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+              <span style="font-weight:700;font-size:14px;color:#0F172A">${s.entreprise || 'Entreprise non renseignée'}</span>
+              <span style="background:${sbg};color:${scol};padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">${statusLabels[s.statut] || s.statut}</span>
+            </div>
+            ${s.contactNom ? `<div style="font-size:12px;color:#64748B">👤 ${s.contactNom}${s.contactEmail ? ' · ' + s.contactEmail : ''}${s.contactTel ? ' · ' + s.contactTel : ''}</div>` : ''}
+            <div style="margin-top:8px;display:flex;gap:16px;flex-wrap:wrap">
+              <span style="font-size:12px;color:#64748B">📤 ${s.lettresEnvoyees || 0} lettres envoyées</span>
+              <span style="font-size:12px;color:#64748B">📥 ${s.lettresRecues || 0} réponses</span>
+              ${s.entretiens?.length ? `<span style="font-size:12px;color:#64748B">🤝 ${s.entretiens.length} entretien(s)</span>` : ''}
+            </div>
+            ${s.convention?.dateDebut ? `<div style="margin-top:6px;font-size:12px;color:#2563EB;font-weight:600">📋 Convention : ${s.convention.dateDebut} → ${s.convention.dateFin || '?'} ${s.convention.signe ? '✅ Signée' : '⏳ Non signée'}</div>` : ''}
+            ${s.attestation?.recu ? `<div style="margin-top:4px;font-size:12px;color:#16A34A;font-weight:600">🎓 Attestation reçue — ${s.attestation.dateSig || '?'}</div>` : ''}
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button onclick="ouvrirModalStage('${eleveId}','${s.id}')"
+              style="background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">✏️ Modifier</button>
+            <button onclick="supprimerStage('${eleveId}','${s.id}')"
+              style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;border-radius:7px;padding:6px 10px;font-size:11px;cursor:pointer">🗑</button>
           </div>
         </div>
-        <span style="background:${statutColors[s.statut]}20;color:${statutColors[s.statut]};border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600">${statutLabels[s.statut]}</span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
-        <div style="background:#F8FAFC;border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:20px;font-weight:800;color:#1E3A8A">${s.recherches.length}</div>
-          <div style="font-size:11px;color:#64748B">Entreprise(s) contactée(s)</div>
-        </div>
-        <div style="background:#F8FAFC;border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:20px;font-weight:800;color:#1E3A8A">${totalLettres} / ${totalRecues}</div>
-          <div style="font-size:11px;color:#64748B">Lettres envoyées / reçues</div>
-        </div>
-        <div style="background:#F8FAFC;border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:20px;font-weight:800;color:#1E3A8A">${totalEntretiens}</div>
-          <div style="font-size:11px;color:#64748B">Entretien(s)</div>
-        </div>
-      </div>
-      ${s.recherches.map(r => `
-        <div style="background:#F8FAFC;border-radius:8px;padding:10px;margin-bottom:6px;font-size:12px">
-          <div style="font-weight:600;color:#0F172A;margin-bottom:2px">${r.entreprise}</div>
-          <div style="color:#64748B">Contact : ${r.contact} · ${r.tel}</div>
-          ${r.entretiens.map(e => `<div style="color:#7C3AED;margin-top:4px">📅 Entretien le ${e.date} — ${e.resultat}</div>`).join('')}
-        </div>
-      `).join('')}
-    </div>`;
-  }).join('');
-}
-
-function renderConventionsList(stages) {
-  const cont = $('stages-conventions-list'); if (!cont) return;
-  const avecConv = stages.filter(s => s.convention);
-
-  if (!avecConv.length) { cont.innerHTML = '<p style="color:#94A3B8;font-size:13px;text-align:center;padding:20px">Aucune convention enregistrée</p>'; return; }
-
-  cont.innerHTML = avecConv.map(s => {
-    const c = s.convention;
-    return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
-        <div>
-          <div style="font-weight:700;font-size:14px;color:#0F172A">${s.eleveNom} — ${c.entreprise}</div>
-          <div style="font-size:12px;color:#64748B;margin-top:2px">Du ${c.dateDebut} au ${c.dateFin} · Tuteur : ${c.tuteur}</div>
-        </div>
-        <div style="display:flex;gap:6px">
-          ${c.valideParReferent ? '<span style="background:#D1FAE5;color:#065F46;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600">✓ Référent</span>' : '<span style="background:#FEF3C7;color:#92400E;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600">⏳ Référent</span>'}
-          ${c.valide ? '<span style="background:#D1FAE5;color:#065F46;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600">✓ Signée</span>' : '<span style="background:#FEF3C7;color:#92400E;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600">⏳ En attente</span>'}
-        </div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button style="background:#EFF6FF;color:#1E40AF;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">📄 Voir la convention PDF</button>
-        ${!c.valide ? `<button onclick="validerConvention('${s.id}')" style="background:#D1FAE5;color:#065F46;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">✓ Valider la convention</button>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function renderAttestationsList(stages) {
-  const cont = $('stages-attestations-list'); if (!cont) return;
-  const avecAtt = stages.filter(s => s.attestation);
-
-  if (!avecAtt.length) { cont.innerHTML = '<p style="color:#94A3B8;font-size:13px;text-align:center;padding:20px">Aucune attestation enregistrée</p>'; return; }
-
-  cont.innerHTML = avecAtt.map(s => {
-    const a = s.attestation;
-    return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-weight:700;font-size:14px;color:#0F172A">${s.eleveNom}</div>
-          <div style="font-size:12px;color:#64748B;margin-top:2px">Stage chez ${s.convention?.entreprise || '—'} · Signée le ${a.dateSignature}</div>
-          ${a.commentaire ? `<div style="font-size:12px;color:#475569;margin-top:6px;font-style:italic">"${a.commentaire}"</div>` : ''}
-        </div>
-        <span style="background:#D1FAE5;color:#065F46;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600">✓ Attestation signée</span>
-      </div>
-      <div style="margin-top:12px">
-        <button style="background:#EFF6FF;color:#1E40AF;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">📄 Télécharger l'attestation PDF</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function validerConvention(stageId) {
-  const stage = SEC_STAGES.find(s => s.id === stageId);
-  if (stage?.convention) { stage.convention.valide = true; renderStagesSection(); }
-}
-
-/* ══════════════════════════════════════════════════════════════
-   SECRÉTARIAT — PROJETS D'ÉTABLISSEMENT
-   ══════════════════════════════════════════════════════════════ */
-
-const SEC_PROJETS = [
-  {
-    id: 'proj1', titre: 'Jardin Pédagogique', description: 'Création et entretien d\'un jardin potager au sein du collège.',
-    dateDebut: '2025-09-01', dateFin: '2026-06-30', statut: 'en_cours',
-    responsableId: 'lefebvre.martin.12032011',
-    participants: [
-      { eleveId: 'lefebvre.martin.12032011', eleveNom: 'Martin Lefebvre', dateDebut: '2025-09-01', dateFin: '2026-06-30' },
-      { eleveId: 'benali.sofia.07092010', eleveNom: 'Sofia Benali', dateDebut: '2025-10-01', dateFin: '2026-06-30' },
-    ],
-  },
-  {
-    id: 'proj2', titre: 'Radio Asimov', description: 'Création d\'une émission de radio scolaire diffusée chaque semaine.',
-    dateDebut: '2025-11-01', dateFin: '2026-05-31', statut: 'valide',
-    responsableId: 'benali.sofia.07092010',
-    participants: [
-      { eleveId: 'benali.sofia.07092010', eleveNom: 'Sofia Benali', dateDebut: '2025-11-01', dateFin: '2026-05-31' },
-    ],
-  },
-  {
-    id: 'proj3', titre: 'Exposition Sciences', description: 'Organisation d\'une exposition scientifique ouverte au public.',
-    dateDebut: '2026-03-01', dateFin: '2026-04-30', statut: 'attente',
-    responsableId: null, participants: [],
-  },
-];
-
-let _projetDetailId = null;
-
-function initSecProjets() {
-  const sel = $('proj-responsable');
-  if (sel && sel.options.length === 1) {
-    Object.values(DB.users).filter(u => u.role === 'eleve').forEach(e => {
-      const opt = document.createElement('option');
-      opt.value = e.id; opt.textContent = `${e.prenom} ${e.nom}`;
-      sel.appendChild(opt);
-    });
-  }
-  renderProjets();
-}
-
-function switchProjetsTab(tab) {
-  ['tous', 'en_cours', 'valide', 'attente'].forEach(t => {
-    const btn = $(`proj-tab-${t}`);
-    if (btn) btn.classList.toggle('active', t === tab);
-  });
-  renderProjets(tab === 'tous' ? null : tab);
-}
-
-function renderProjets(statutFilter = null) {
-  const cont = $('projets-list'); if (!cont) return;
-  let projets = [...SEC_PROJETS];
-  if (statutFilter) projets = projets.filter(p => p.statut === statutFilter);
-
-  const statutColors = { attente: '#F59E0B', valide: '#10B981', en_cours: '#3B82F6' };
-  const statutLabels = { attente: '⏳ En attente de validation', valide: '✓ Validé par la commission', en_cours: '▶ En cours' };
-
-  if (!projets.length) { cont.innerHTML = '<p style="color:#94A3B8;font-size:13px;text-align:center;padding:30px">Aucun projet pour ce filtre</p>'; return; }
-
-  cont.innerHTML = projets.map(p => {
-    const responsable = p.responsableId ? DB.users[p.responsableId] : null;
-    const debut = p.dateDebut ? new Date(p.dateDebut).toLocaleDateString('fr-FR') : '—';
-    const fin = p.dateFin ? new Date(p.dateFin).toLocaleDateString('fr-FR') : '—';
-
-    return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.04)">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-        <div style="flex:1">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-            <h3 style="font-size:16px;font-weight:700;color:#0F172A">${p.titre}</h3>
-            <span style="background:${statutColors[p.statut]}20;color:${statutColors[p.statut]};border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600">${statutLabels[p.statut]}</span>
-          </div>
-          <p style="font-size:13px;color:#475569;margin-bottom:10px">${p.description}</p>
-          <div style="display:flex;gap:16px;font-size:12px;color:#64748B">
-            <span>📅 ${debut} → ${fin}</span>
-            <span>👤 Responsable : ${responsable ? `${responsable.prenom} ${responsable.nom}` : 'Non défini'}</span>
-            <span>🧑‍🎓 ${p.participants.length} participant(s)</span>
-          </div>
-        </div>
-        <div style="display:flex;gap:6px;margin-left:16px">
-          ${p.statut === 'attente' ? `<button onclick="validerProjet('${p.id}')" style="background:#D1FAE5;color:#065F46;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer">✓ Valider</button>` : ''}
-          <button onclick="ouvrirDetailProjet('${p.id}')" class="btn-primary" style="padding:7px 12px;font-size:12px">Détails</button>
-          <button onclick="supprimerProjet('${p.id}')" style="background:#FEE2E2;color:#DC2626;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer">🗑 Supprimer</button>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function validerProjet(id) {
-  const p = SEC_PROJETS.find(x => x.id === id);
-  if (p) { p.statut = 'valide'; renderProjets(); }
-}
-
-function supprimerProjet(id) {
-  const p = SEC_PROJETS.find(x => x.id === id); if (!p) return;
-  if (!confirm(`Supprimer le projet "${p.titre}" ? Cette action est irréversible.`)) return;
-  const idx = SEC_PROJETS.findIndex(x => x.id === id);
-  if (idx !== -1) SEC_PROJETS.splice(idx, 1);
-  renderProjets();
-}
-
-function ouvrirDetailProjet(id) {
-  _projetDetailId = id;
-  const p = SEC_PROJETS.find(x => x.id === id); if (!p) return;
-  $('detail-proj-titre').textContent = p.titre;
-  $('detail-proj-desc').textContent = p.description;
-  $('detail-proj-debut').textContent = p.dateDebut ? new Date(p.dateDebut).toLocaleDateString('fr-FR') : '—';
-  $('detail-proj-fin').textContent = p.dateFin ? new Date(p.dateFin).toLocaleDateString('fr-FR') : '—';
-  const statutLabels = { attente: '⏳ En attente', valide: '✓ Validé', en_cours: '▶ En cours' };
-  $('detail-proj-statut-badge').textContent = statutLabels[p.statut] || p.statut;
-
-  const partCont = $('detail-proj-participants');
-  partCont.innerHTML = p.participants.length === 0
-    ? '<p style="color:#94A3B8;font-size:13px">Aucun participant</p>'
-    : p.participants.map(pt => {
-      const debut = pt.dateDebut ? new Date(pt.dateDebut).toLocaleDateString('fr-FR') : '—';
-      const fin = pt.dateFin ? new Date(pt.dateFin).toLocaleDateString('fr-FR') : '—';
-      const isResp = p.responsableId === pt.eleveId;
-      return `<div style="display:flex;align-items:center;justify-content:space-between;background:#F8FAFC;border-radius:8px;padding:10px 12px">
-        <div>
-          <span style="font-size:13px;font-weight:600;color:#0F172A">${pt.eleveNom}</span>
-          ${isResp ? '<span style="background:#FEF9C3;color:#854D0E;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;margin-left:6px">RESPONSABLE</span>' : ''}
-          <div style="font-size:11px;color:#94A3B8;margin-top:2px">${debut} → ${fin}</div>
-        </div>
-        <button onclick="retirerParticipantProjet('${id}','${pt.eleveId}')" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:12px;font-weight:600">Retirer</button>
       </div>`;
     }).join('');
-
-  const modal = $('modal-detail-projet');
-  if (modal) { modal.classList.remove('hidden'); modal.style.display = 'flex'; }
+  }
+  container.innerHTML = html;
 }
 
-function closeModalDetailProjet() {
-  const modal = $('modal-detail-projet');
-  if (modal) { modal.classList.add('hidden'); modal.style.display = 'none'; }
-  _projetDetailId = null;
+function ouvrirModalStage(eleveId, stageId) {
+  const stages = STAGES_DATA[eleveId] || [];
+  const s = stageId ? stages.find(x => x.id === stageId) : null;
+  const existing = document.getElementById('modal-stage');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'modal-stage';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(4px)';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;width:min(580px,96vw);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.3);overflow:hidden">
+      <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;background:#1E3A8A;color:#fff;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-weight:700;font-size:15px">${stageId ? '✏️ Modifier le stage' : '+ Nouveau stage'}</div>
+        <button onclick="document.getElementById('modal-stage').remove()" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;width:30px;height:30px;color:#fff;cursor:pointer;font-size:16px">✕</button>
+      </div>
+      <div style="overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Entreprise</label>
+            <input type="text" id="stg-entreprise" value="${s?.entreprise || ''}" placeholder="Nom de l'entreprise"
+              style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px"/>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Statut</label>
+            <select id="stg-statut" style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px">
+              <option value="recherche" ${s?.statut === 'recherche' ? 'selected' : ''}>🔍 En recherche</option>
+              <option value="convention" ${s?.statut === 'convention' ? 'selected' : ''}>📝 Convention</option>
+              <option value="attestation" ${s?.statut === 'attestation' ? 'selected' : ''}>🎓 Terminé</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Contact (nom)</label>
+            <input type="text" id="stg-contact-nom" value="${s?.contactNom || ''}" placeholder="Prénom Nom"
+              style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px"/>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Contact (email)</label>
+            <input type="email" id="stg-contact-email" value="${s?.contactEmail || ''}" placeholder="email@entreprise.fr"
+              style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px"/>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Téléphone</label>
+            <input type="text" id="stg-contact-tel" value="${s?.contactTel || ''}"
+              style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px"/>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Lettres envoyées</label>
+            <input type="number" id="stg-lettres-env" min="0" value="${s?.lettresEnvoyees || 0}"
+              style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px"/>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Réponses reçues</label>
+            <input type="number" id="stg-lettres-rec" min="0" value="${s?.lettresRecues || 0}"
+              style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px"/>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Date début stage</label>
+            <input type="date" id="stg-date-debut" value="${s?.convention?.dateDebut || ''}"
+              style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px"/>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Date fin stage</label>
+            <input type="date" id="stg-date-fin" value="${s?.convention?.dateFin || ''}"
+              style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px"/>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:#374151">
+            <input type="checkbox" id="stg-convention-signe" ${s?.convention?.signe ? 'checked' : ''}> Convention signée
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:#374151">
+            <input type="checkbox" id="stg-attestation" ${s?.attestation?.recu ? 'checked' : ''}> Attestation reçue
+          </label>
+        </div>
+      </div>
+      <div style="padding:16px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:8px">
+        <button onclick="document.getElementById('modal-stage').remove()" style="padding:9px 18px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;font-family:'Sora',sans-serif">Annuler</button>
+        <button onclick="sauvegarderStage('${eleveId}','${stageId || ''}')" style="padding:9px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff;cursor:pointer;font-family:'Sora',sans-serif;font-weight:600">💾 Enregistrer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
 }
 
-function retirerParticipantProjet(projetId, eleveId) {
-  const p = SEC_PROJETS.find(x => x.id === projetId); if (!p) return;
-  p.participants = p.participants.filter(pt => pt.eleveId !== eleveId);
-  if (p.responsableId === eleveId) p.responsableId = null;
-  ouvrirDetailProjet(projetId);
+function sauvegarderStage(eleveId, stageId) {
+  const entreprise = $('stg-entreprise')?.value.trim();
+  if (!entreprise) { showToast('⚠️ Renseignez le nom de l\'entreprise'); return; }
+  if (!STAGES_DATA[eleveId]) STAGES_DATA[eleveId] = [];
+  const data = {
+    entreprise, statut: $('stg-statut')?.value || 'recherche',
+    contactNom: $('stg-contact-nom')?.value.trim(),
+    contactEmail: $('stg-contact-email')?.value.trim(),
+    contactTel: $('stg-contact-tel')?.value.trim(),
+    lettresEnvoyees: parseInt($('stg-lettres-env')?.value) || 0,
+    lettresRecues: parseInt($('stg-lettres-rec')?.value) || 0,
+    convention: {
+      dateDebut: $('stg-date-debut')?.value,
+      dateFin: $('stg-date-fin')?.value,
+      signe: $('stg-convention-signe')?.checked || false,
+    },
+    attestation: { recu: $('stg-attestation')?.checked || false, dateSig: new Date().toLocaleDateString('fr-FR') },
+  };
+  if (stageId) {
+    const idx = STAGES_DATA[eleveId].findIndex(s => s.id === stageId);
+    if (idx !== -1) STAGES_DATA[eleveId][idx] = { ...STAGES_DATA[eleveId][idx], ...data };
+  } else {
+    STAGES_DATA[eleveId].unshift({ id: `stg-${Date.now()}`, eleveId, ...data });
+  }
+  document.getElementById('modal-stage')?.remove();
+  renderStagesEleve();
+  showToast('✅ Stage enregistré');
 }
 
-function openModalAjouterParticipant() {
-  if (!_projetDetailId) return;
-  const p = SEC_PROJETS.find(x => x.id === _projetDetailId); if (!p) return;
-  const deja = p.participants.map(pt => pt.eleveId);
-  const eleves = Object.values(DB.users).filter(u => u.role === 'eleve' && !deja.includes(u.id));
-  if (!eleves.length) { alert('Tous les élèves participent déjà à ce projet.'); return; }
-
-  const eleveChoisi = eleves[0];
-  const confirme = confirm(`Ajouter ${eleveChoisi.prenom} ${eleveChoisi.nom} au projet ? (Pour choisir un autre élève, utilisez la sélection)`);
-  if (!confirme) return;
-  p.participants.push({ eleveId: eleveChoisi.id, eleveNom: `${eleveChoisi.prenom} ${eleveChoisi.nom}`, dateDebut: new Date().toISOString().split('T')[0], dateFin: p.dateFin });
-  ouvrirDetailProjet(_projetDetailId);
+function supprimerStage(eleveId, stageId) {
+  if (!confirm('Supprimer ce stage ?')) return;
+  STAGES_DATA[eleveId] = (STAGES_DATA[eleveId] || []).filter(s => s.id !== stageId);
+  renderStagesEleve();
+  showToast('🗑 Stage supprimé');
 }
 
-function openModalNouveauProjet() {
-  const modal = $('modal-nouveau-projet');
-  if (modal) { modal.classList.remove('hidden'); modal.style.display = 'flex'; }
+/* ────────────────────────────────────────────────────────────
+   4. PROJETS ÉTABLISSEMENT
+   ──────────────────────────────────────────────────────────── */
+
+const PROJETS_ETAB = [];
+/* Structure : { id, titre, description, responsableId, statut:'proposition'|'valide'|'en_cours'|'termine',
+    dateCreation, participants:[{eleveId,dateDebut,dateFin}] } */
+
+function initSecretariatProjets() {
+  renderProjetsListe();
 }
 
-function closeModalNouveauProjet() {
-  const modal = $('modal-nouveau-projet');
-  if (modal) { modal.classList.add('hidden'); modal.style.display = 'none'; }
-}
-
-function soumettreNouveauProjet() {
-  const titre = $('proj-titre')?.value?.trim();
-  const desc = $('proj-description')?.value?.trim();
-  const debut = $('proj-date-debut')?.value;
-  const fin = $('proj-date-fin')?.value;
-  const responsableId = $('proj-responsable')?.value;
-
-  if (!titre || !desc) { alert('Le titre et la description sont obligatoires.'); return; }
-
-  const newProjet = {
-    id: 'proj' + Date.now(), titre, description: desc,
-    dateDebut: debut || null, dateFin: fin || null,
-    statut: 'attente', responsableId: responsableId || null,
-    participants: responsableId ? [{
-      eleveId: responsableId,
-      eleveNom: (() => { const u = DB.users[responsableId]; return u ? `${u.prenom} ${u.nom}` : ''; })(),
-      dateDebut: debut || null, dateFin: fin || null,
-    }] : [],
+function renderProjetsListe() {
+  const container = $('projets-liste');
+  if (!container) return;
+  const statusLabels = { proposition:'💡 Proposition', valide:'✅ Validé', en_cours:'⚡ En cours', termine:'🏁 Terminé' };
+  const statusColors = {
+    proposition:'#FEF3C7,#D97706', valide:'#DBEAFE,#2563EB',
+    en_cours:'#DCFCE7,#15803D', termine:'#F1F5F9,#64748B'
   };
 
-  SEC_PROJETS.unshift(newProjet);
-  closeModalNouveauProjet();
-  ['proj-titre', 'proj-description', 'proj-date-debut', 'proj-date-fin'].forEach(id => { const el = $(id); if (el) el.value = ''; });
-  alert('✅ Projet soumis à la commission du lycée pour validation.');
-  renderProjets();
+  if (!PROJETS_ETAB.length) {
+    container.innerHTML = '<div style="background:#F8FAFC;border-radius:12px;border:2px dashed #E2E8F0;padding:40px;text-align:center;color:#94A3B8;font-size:13px">Aucun projet enregistré. Créez le premier projet !</div>';
+    return;
+  }
+
+  container.innerHTML = PROJETS_ETAB.map(p => {
+    const [pbg, pcol] = (statusColors[p.statut] || '#F1F5F9,#64748B').split(',');
+    const resp = Auth.getAll().find(u => u.id === p.responsableId);
+    const nbPart = p.participants?.length || 0;
+    const canValider = currentUser?.role === 'principal' && p.statut === 'proposition';
+    return `<div style="background:#fff;border-radius:12px;border:1.5px solid #E2E8F0;padding:18px 20px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.04)">
+      <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+            <span style="font-weight:700;font-size:14px;color:#0F172A">${p.titre}</span>
+            <span style="background:${pbg};color:${pcol};padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">${statusLabels[p.statut] || p.statut}</span>
+          </div>
+          ${p.description ? `<div style="font-size:12px;color:#64748B;margin-bottom:6px">${p.description}</div>` : ''}
+          <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#64748B">
+            ${resp ? `<span>👤 Responsable : <strong>${resp.prenom} ${resp.nom}</strong></span>` : ''}
+            <span>👥 ${nbPart} participant${nbPart > 1 ? 's' : ''}</span>
+            <span>📅 ${p.dateCreation || '—'}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap">
+          ${canValider ? `<button onclick="validerProjet('${p.id}')" style="background:#DCFCE7;color:#15803D;border:1px solid #BBF7D0;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">✅ Valider</button>` : ''}
+          <button onclick="ouvrirParticipants('${p.id}')" style="background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">👥 Participants</button>
+          <button onclick="supprimerProjet('${p.id}')" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;border-radius:7px;padding:6px 10px;font-size:11px;cursor:pointer">🗑</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-/* Gestion de l'affichage des nouvelles sections dans showAdminSection */
-const _origShowAdminSection = showAdminSection;
-showAdminSection = function (id, el) {
-  _origShowAdminSection(id, el);
-  if (id === 'sec-moyennes') { initSecMoyennes(); renderMoyennesTable(); }
-  if (id === 'sec-referents') renderReferents();
-  if (id === 'sec-stages') renderStagesSection();
-  if (id === 'sec-projets') renderProjets();
-};
+function ouvrirModalProjet() {
+  const existing = document.getElementById('modal-projet');
+  if (existing) existing.remove();
+  const profs = Auth.getAll().filter(u => u.role === 'professeur');
+  const modal = document.createElement('div');
+  modal.id = 'modal-projet';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(4px)';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;width:min(520px,96vw);box-shadow:0 24px 64px rgba(0,0,0,.3);overflow:hidden">
+      <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;background:#1E3A8A;color:#fff;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-weight:700;font-size:15px">+ Nouveau projet</div>
+        <button onclick="document.getElementById('modal-projet').remove()" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;width:30px;height:30px;color:#fff;cursor:pointer;font-size:16px">✕</button>
+      </div>
+      <div style="padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Titre du projet</label>
+          <input type="text" id="prj-titre" placeholder="Nom du projet"
+            style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px"/>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Description</label>
+          <textarea id="prj-desc" rows="3" placeholder="Objectifs et contenu..."
+            style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px;resize:none"></textarea>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#64748B;display:block;margin-bottom:5px">Responsable (prof référent)</label>
+          <select id="prj-resp" style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:'Sora',sans-serif;font-size:13px">
+            <option value="">— Aucun —</option>
+            ${profs.map(p => `<option value="${p.id}">${p.prenom} ${p.nom}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div style="padding:16px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:8px">
+        <button onclick="document.getElementById('modal-projet').remove()" style="padding:9px 18px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;font-family:'Sora',sans-serif">Annuler</button>
+        <button onclick="sauvegarderProjet()" style="padding:9px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff;cursor:pointer;font-family:'Sora',sans-serif;font-weight:600">💾 Créer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function sauvegarderProjet() {
+  const titre = $('prj-titre')?.value.trim();
+  if (!titre) { showToast('⚠️ Renseignez le titre du projet'); return; }
+  PROJETS_ETAB.unshift({
+    id: `prj-${Date.now()}`, titre,
+    description: $('prj-desc')?.value.trim(),
+    responsableId: $('prj-resp')?.value || null,
+    statut: 'proposition',
+    dateCreation: new Date().toLocaleDateString('fr-FR'),
+    participants: [],
+  });
+  document.getElementById('modal-projet')?.remove();
+  renderProjetsListe();
+  showToast('💡 Projet soumis — En attente de validation par le proviseur');
+}
+
+function validerProjet(projetId) {
+  if (currentUser?.role !== 'principal') { showToast('⛔ Seul le proviseur peut valider un projet'); return; }
+  const p = PROJETS_ETAB.find(x => x.id === projetId);
+  if (p) { p.statut = 'en_cours'; renderProjetsListe(); showToast('✅ Projet validé et lancé'); }
+}
+
+function supprimerProjet(projetId) {
+  if (!confirm('Supprimer ce projet ?')) return;
+  const idx = PROJETS_ETAB.findIndex(p => p.id === projetId);
+  if (idx !== -1) { PROJETS_ETAB.splice(idx, 1); renderProjetsListe(); showToast('🗑 Projet supprimé'); }
+}
+
+function ouvrirParticipants(projetId) {
+  const p = PROJETS_ETAB.find(x => x.id === projetId);
+  if (!p) return;
+  const existing = document.getElementById('modal-participants');
+  if (existing) existing.remove();
+  const eleves = Auth.getAll().filter(u => u.role === 'eleve').sort((a,b) => a.nom.localeCompare(b.nom,'fr'));
+  const modal = document.createElement('div');
+  modal.id = 'modal-participants';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(4px)';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;width:min(560px,96vw);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.3);overflow:hidden">
+      <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;background:#1E3A8A;color:#fff;display:flex;align-items:center;justify-content:space-between">
+        <div><div style="font-weight:700;font-size:15px">👥 Participants — ${p.titre}</div></div>
+        <button onclick="document.getElementById('modal-participants').remove()" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;width:30px;height:30px;color:#fff;cursor:pointer;font-size:16px">✕</button>
+      </div>
+      <div style="overflow-y:auto;padding:16px 20px;flex:1">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${eleves.map(e => {
+            const part = p.participants.find(x => x.eleveId === e.id);
+            return `<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;background:${part ? '#F0FDF4' : '#F8FAFC'};border-radius:9px;border:1px solid ${part ? '#BBF7D0' : '#E2E8F0'}">
+              <input type="checkbox" id="part-${e.id}" ${part ? 'checked' : ''} onchange="toggleParticipant('${projetId}','${e.id}',this.checked)" style="width:16px;height:16px;cursor:pointer"/>
+              <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#0F172A">${e.prenom} ${e.nom}</div><div style="font-size:11px;color:#64748B">${e.classe || '—'}</div></div>
+              ${part ? `<div style="display:flex;gap:8px;align-items:center">
+                <input type="date" value="${part.dateDebut || ''}" onchange="setPartDate('${projetId}','${e.id}','debut',this.value)"
+                  style="padding:4px 7px;border:1px solid #BBF7D0;border-radius:6px;font-size:11px;font-family:'Sora',sans-serif" placeholder="Début"/>
+                <span style="font-size:10px;color:#94A3B8">→</span>
+                <input type="date" value="${part.dateFin || ''}" onchange="setPartDate('${projetId}','${e.id}','fin',this.value)"
+                  style="padding:4px 7px;border:1px solid #BBF7D0;border-radius:6px;font-size:11px;font-family:'Sora',sans-serif" placeholder="Fin"/>
+              </div>` : ''}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end">
+        <button onclick="document.getElementById('modal-participants').remove();renderProjetsListe()" style="padding:9px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff;cursor:pointer;font-family:'Sora',sans-serif;font-weight:600">✅ Fermer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function toggleParticipant(projetId, eleveId, checked) {
+  const p = PROJETS_ETAB.find(x => x.id === projetId);
+  if (!p) return;
+  if (checked) {
+    if (!p.participants.find(x => x.eleveId === eleveId))
+      p.participants.push({ eleveId, dateDebut: '', dateFin: '' });
+  } else {
+    p.participants = p.participants.filter(x => x.eleveId !== eleveId);
+  }
+  // Re-render la ligne
+  const row = document.getElementById('part-' + eleveId)?.closest('div[style]');
+  if (row) ouvrirParticipants(projetId); // simplement rouvrir la modal à jour
+}
+
+function setPartDate(projetId, eleveId, type, val) {
+  const p = PROJETS_ETAB.find(x => x.id === projetId);
+  const part = p?.participants.find(x => x.eleveId === eleveId);
+  if (part) part[type === 'debut' ? 'dateDebut' : 'dateFin'] = val;
+}
+
+/* ────────────────────────────────────────────────────────────
+   NAVIGATION SECRÉTARIAT — init des sous-sections
+   ──────────────────────────────────────────────────────────── */
+function showAdminSectionWithInit(id, linkEl) {
+  showAdminSection(id, linkEl);
+  if (id === 'admin-historique') initSecretariatHistorique();
+  if (id === 'admin-referents') initSecretariatReferents();
+  if (id === 'admin-stages') initSecretariatStages();
+  if (id === 'admin-projets') initSecretariatProjets();
+}

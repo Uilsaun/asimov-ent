@@ -109,9 +109,9 @@ College-asimov-V2/
  
 | Username | Password | Name | Class |
 |---|---|---|---|
-| `lefebvre.martin.12032011` | *(via Supabase Auth)* | Martin Lefebvre | 4ème B |
-| `benali.sofia.07092010` | *(via Supabase Auth)* | Sofia Benali | 3ème A |
-| `lefebvre.emma.05112013` | *(via Supabase Auth)* | Emma Lefebvre | 6ème A |
+| `lefebvre.martin.12032011` | *auto* | Martin Lefebvre | 4ème B |
+| `benali.sofia.07092010` | *auto* | Sofia Benali | 3ème A |
+| `lefebvre.emma.05112013` | *auto* | Emma Lefebvre | 6ème A |
  
 ### Parents
  
