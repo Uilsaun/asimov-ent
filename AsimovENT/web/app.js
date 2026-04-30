@@ -6072,6 +6072,7 @@ function renderProjets(statutFilter = null) {
         <div style="display:flex;gap:6px;margin-left:16px">
           ${p.statut === 'attente' ? `<button onclick="validerProjet('${p.id}')" style="background:#D1FAE5;color:#065F46;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer">✓ Valider</button>` : ''}
           <button onclick="ouvrirDetailProjet('${p.id}')" class="btn-primary" style="padding:7px 12px;font-size:12px">Détails</button>
+          <button onclick="supprimerProjet('${p.id}')" style="background:#FEE2E2;color:#DC2626;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer">🗑 Supprimer</button>
         </div>
       </div>
     </div>`;
@@ -6081,6 +6082,14 @@ function renderProjets(statutFilter = null) {
 function validerProjet(id) {
   const p = SEC_PROJETS.find(x => x.id === id);
   if (p) { p.statut = 'valide'; renderProjets(); }
+}
+
+function supprimerProjet(id) {
+  const p = SEC_PROJETS.find(x => x.id === id); if (!p) return;
+  if (!confirm(`Supprimer le projet "${p.titre}" ? Cette action est irréversible.`)) return;
+  const idx = SEC_PROJETS.findIndex(x => x.id === id);
+  if (idx !== -1) SEC_PROJETS.splice(idx, 1);
+  renderProjets();
 }
 
 function ouvrirDetailProjet(id) {
