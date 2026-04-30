@@ -1831,6 +1831,40 @@
             Messages site
             <span class="nav-badge" id="faq-msg-badge" style="display:none">0</span>
           </a>
+          <!-- Secrétariat uniquement -->
+          <a href="#" class="nav-item sec-only" style="display:none" onclick="showAdminSection('sec-moyennes', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+            </svg>
+            Moyennes semestrielles
+          </a>
+          <a href="#" class="nav-item sec-only" style="display:none" onclick="showAdminSection('sec-referents', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87" />
+              <path d="M16 3.13a4 4 0 010 7.75" />
+            </svg>
+            Enseignants référents
+            <span id="badge-referents-nav"
+              style="background:#EF4444;color:#fff;border-radius:20px;padding:1px 6px;font-size:10px;margin-left:auto;display:none">0</span>
+          </a>
+          <a href="#" class="nav-item sec-only" style="display:none" onclick="showAdminSection('sec-stages', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="7" width="20" height="14" rx="2" />
+              <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
+            </svg>
+            Stages
+          </a>
+          <a href="#" class="nav-item sec-only" style="display:none" onclick="showAdminSection('sec-projets', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 2 7 12 12 22 7 12 2" />
+              <polyline points="2 17 12 22 22 17" />
+              <polyline points="2 12 12 17 22 12" />
+            </svg>
+            Projets d'établissement
+          </a>
           <!-- CPE uniquement -->
           <a href="#" class="nav-item cpe-only" style="display:none"
             onclick="showAdminSection('cpe-absences-eleves', this)">
@@ -2416,6 +2450,267 @@
             </button>
           </div>
           <div id="stats-direction-container"></div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════
+             SECTION : MOYENNES PAR SEMESTRE (SECRÉTARIAT)
+             Saisie secrétariat → validation proviseur uniquement
+        ══════════════════════════════════════════════════ -->
+        <section id="section-sec-moyennes" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Moyennes par semestre</h2>
+              <p class="section-subtitle">Saisie des moyennes générales — validation par le proviseur</p>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="sec-moy-classe-select" class="input-pro" style="width:160px" onchange="renderMoyennesTable()">
+                <option value="">— Classe —</option>
+              </select>
+              <select id="sec-moy-semestre-select" class="input-pro" style="width:160px"
+                onchange="renderMoyennesTable()">
+                <option value="S1">Semestre 1</option>
+                <option value="S2">Semestre 2</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Légende statuts -->
+          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+            <span style="font-size:12px;color:#64748B;display:flex;align-items:center;gap:5px">
+              <span style="width:10px;height:10px;border-radius:50%;background:#F59E0B;display:inline-block"></span>En
+              attente de validation
+            </span>
+            <span style="font-size:12px;color:#64748B;display:flex;align-items:center;gap:5px">
+              <span
+                style="width:10px;height:10px;border-radius:50%;background:#10B981;display:inline-block"></span>Validée
+              par le proviseur
+            </span>
+            <span style="font-size:12px;color:#64748B;display:flex;align-items:center;gap:5px">
+              <span
+                style="width:10px;height:10px;border-radius:50%;background:#3B82F6;display:inline-block"></span>Corrigée
+              par le proviseur
+            </span>
+          </div>
+
+          <div id="sec-moyennes-container">
+            <p style="text-align:center;color:#94A3B8;padding:40px;font-size:13px">Sélectionnez une classe et un
+              semestre</p>
+          </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════
+             SECTION : ENSEIGNANTS RÉFÉRENTS
+        ══════════════════════════════════════════════════ -->
+        <section id="section-sec-referents" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Enseignants référents</h2>
+              <p class="section-subtitle">Affectation des professeurs référents aux élèves</p>
+            </div>
+            <button class="btn-primary" onclick="affectationRoundRobin()"
+              style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15">
+                <polyline points="17 1 21 5 17 9" />
+                <path d="M3 11V9a4 4 0 014-4h14" />
+                <polyline points="7 23 3 19 7 15" />
+                <path d="M21 13v2a4 4 0 01-4 4H3" />
+              </svg>
+              Affectation automatique (round-robin)
+            </button>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            <!-- Liste des profs avec leurs élèves référents -->
+            <div>
+              <h3 style="font-size:14px;font-weight:700;color:#0F172A;margin-bottom:12px">Par professeur référent</h3>
+              <div id="referents-par-prof" style="display:flex;flex-direction:column;gap:10px"></div>
+            </div>
+            <!-- Élèves sans référent -->
+            <div>
+              <h3 style="font-size:14px;font-weight:700;color:#0F172A;margin-bottom:12px">
+                Élèves sans référent
+                <span id="badge-sans-referent"
+                  style="background:#EF4444;color:#fff;border-radius:20px;padding:2px 8px;font-size:11px;margin-left:6px">0</span>
+              </h3>
+              <div id="eleves-sans-referent" style="display:flex;flex-direction:column;gap:8px"></div>
+            </div>
+          </div>
+
+          <!-- Modal affectation manuelle -->
+          <div id="modal-affecter-referent"
+            style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center"
+            class="hidden">
+            <div
+              style="background:#fff;border-radius:16px;padding:28px;width:400px;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+              <h3 style="font-size:16px;font-weight:700;margin-bottom:4px">Affecter un référent</h3>
+              <p id="modal-referent-eleve-nom" style="font-size:13px;color:#64748B;margin-bottom:16px"></p>
+              <select id="modal-referent-prof-select" class="input-pro" style="width:100%;margin-bottom:16px">
+                <option value="">— Choisir un professeur —</option>
+              </select>
+              <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button class="btn-secondary" onclick="closeModalReferent()">Annuler</button>
+                <button class="btn-primary" onclick="confirmerAffectationReferent()">Affecter</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════
+             SECTION : STAGES
+        ══════════════════════════════════════════════════ -->
+        <section id="section-sec-stages" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Stages</h2>
+              <p class="section-subtitle">Suivi des recherches, conventions et attestations</p>
+            </div>
+            <div style="display:flex;gap:8px">
+              <select id="sec-stages-classe-filter" class="input-pro" style="width:160px"
+                onchange="renderStagesSection()">
+                <option value="">Toutes les classes</option>
+              </select>
+              <select id="sec-stages-statut-filter" class="input-pro" style="width:160px"
+                onchange="renderStagesSection()">
+                <option value="">Tous les statuts</option>
+                <option value="recherche">En recherche</option>
+                <option value="convention_en_attente">Convention en attente</option>
+                <option value="convention_validee">Convention validée</option>
+                <option value="stage_en_cours">Stage en cours</option>
+                <option value="atteste">Attesté</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Onglets -->
+          <div
+            style="display:flex;gap:4px;background:#F1F5F9;border-radius:10px;padding:4px;margin-bottom:20px;width:fit-content">
+            <button class="msg-tab active" id="stages-tab-recherches" onclick="switchStagesTab('recherches')">🔍
+              Recherches</button>
+            <button class="msg-tab" id="stages-tab-conventions" onclick="switchStagesTab('conventions')">📄
+              Conventions</button>
+            <button class="msg-tab" id="stages-tab-attestations" onclick="switchStagesTab('attestations')">✅
+              Attestations</button>
+          </div>
+
+          <!-- Onglet Recherches -->
+          <div id="stages-panel-recherches">
+            <div id="stages-recherches-list" style="display:flex;flex-direction:column;gap:12px"></div>
+          </div>
+
+          <!-- Onglet Conventions -->
+          <div id="stages-panel-conventions" style="display:none">
+            <div id="stages-conventions-list" style="display:flex;flex-direction:column;gap:12px"></div>
+          </div>
+
+          <!-- Onglet Attestations -->
+          <div id="stages-panel-attestations" style="display:none">
+            <div id="stages-attestations-list" style="display:flex;flex-direction:column;gap:12px"></div>
+          </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════
+             SECTION : PROJETS D'ÉTABLISSEMENT
+        ══════════════════════════════════════════════════ -->
+        <section id="section-sec-projets" class="dash-section">
+          <div class="section-header">
+            <div>
+              <h2>Projets d'établissement</h2>
+              <p class="section-subtitle">Participation et responsabilité aux projets</p>
+            </div>
+            <button class="btn-primary" onclick="openModalNouveauProjet()"
+              style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Nouveau projet
+            </button>
+          </div>
+
+          <!-- Filtres statut projet -->
+          <div
+            style="display:flex;gap:4px;background:#F1F5F9;border-radius:10px;padding:4px;margin-bottom:20px;width:fit-content">
+            <button class="msg-tab active" id="proj-tab-tous" onclick="switchProjetsTab('tous')">Tous</button>
+            <button class="msg-tab" id="proj-tab-en_cours" onclick="switchProjetsTab('en_cours')">En cours</button>
+            <button class="msg-tab" id="proj-tab-valide" onclick="switchProjetsTab('valide')">Validés</button>
+            <button class="msg-tab" id="proj-tab-attente" onclick="switchProjetsTab('attente')">En attente</button>
+          </div>
+
+          <div id="projets-list" style="display:flex;flex-direction:column;gap:14px"></div>
+
+          <!-- Modal nouveau projet -->
+          <div id="modal-nouveau-projet" class="hidden"
+            style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center">
+            <div
+              style="background:#fff;border-radius:16px;padding:28px;width:480px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+              <h3 style="font-size:16px;font-weight:700;margin-bottom:16px">Nouveau projet d'établissement</h3>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <input type="text" id="proj-titre" placeholder="Titre du projet" class="input-pro">
+                <textarea id="proj-description" placeholder="Description du projet..." class="input-pro"
+                  style="height:80px;resize:vertical"></textarea>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                  <div>
+                    <label style="font-size:12px;color:#64748B;font-weight:600">Date de début</label>
+                    <input type="date" id="proj-date-debut" class="input-pro" style="width:100%">
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:#64748B;font-weight:600">Date de fin prévue</label>
+                    <input type="date" id="proj-date-fin" class="input-pro" style="width:100%">
+                  </div>
+                </div>
+                <div>
+                  <label style="font-size:12px;color:#64748B;font-weight:600">Responsable (élève)</label>
+                  <select id="proj-responsable" class="input-pro" style="width:100%">
+                    <option value="">— Aucun responsable —</option>
+                  </select>
+                </div>
+                <p style="font-size:11px;color:#94A3B8;font-style:italic">⚠️ Le projet doit être validé par la
+                  commission du lycée avant d'être actif.</p>
+              </div>
+              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+                <button class="btn-secondary" onclick="closeModalNouveauProjet()">Annuler</button>
+                <button class="btn-primary" onclick="soumettreNouveauProjet()">Soumettre à la commission</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal détail projet -->
+          <div id="modal-detail-projet" class="hidden"
+            style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center">
+            <div
+              style="background:#fff;border-radius:16px;padding:28px;width:560px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+                <div>
+                  <h3 id="detail-proj-titre" style="font-size:18px;font-weight:700;color:#0F172A"></h3>
+                  <p id="detail-proj-statut-badge" style="font-size:12px;margin-top:4px"></p>
+                </div>
+                <button onclick="closeModalDetailProjet()"
+                  style="background:none;border:none;font-size:20px;cursor:pointer;color:#94A3B8">✕</button>
+              </div>
+              <p id="detail-proj-desc" style="font-size:14px;color:#475569;margin-bottom:20px;line-height:1.6"></p>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+                <div style="background:#F8FAFC;border-radius:10px;padding:12px">
+                  <div style="font-size:11px;color:#94A3B8;font-weight:600;margin-bottom:4px">DATE DÉBUT</div>
+                  <div id="detail-proj-debut" style="font-size:14px;font-weight:600;color:#0F172A"></div>
+                </div>
+                <div style="background:#F8FAFC;border-radius:10px;padding:12px">
+                  <div style="font-size:11px;color:#94A3B8;font-weight:600;margin-bottom:4px">DATE FIN</div>
+                  <div id="detail-proj-fin" style="font-size:14px;font-weight:600;color:#0F172A"></div>
+                </div>
+              </div>
+              <h4 style="font-size:13px;font-weight:700;margin-bottom:10px">Participants</h4>
+              <div id="detail-proj-participants" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+              </div>
+              <button class="btn-primary" onclick="openModalAjouterParticipant()"
+                style="display:flex;align-items:center;gap:6px;font-size:13px;padding:8px 14px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Ajouter un participant
+              </button>
+            </div>
+          </div>
         </section>
 
       </main>
