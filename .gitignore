@@ -1,6 +1,7 @@
 # Node
 api/node_modules/
 api/.env
+api/*.log
 
 # C# build
 desktop/AsimovENT-Desktop/bin/
