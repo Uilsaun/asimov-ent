@@ -104,7 +104,7 @@ async function handleLogin(e) {
   const btn = document.querySelector('#form-login .btn-login');
   if (btn) { btn.disabled = true; btn.textContent = 'Connexion en cours…'; }
 
-  const result = await SupabaseAuth.login(username, password, null);
+  const result = await SupabaseAuth.login(username, password, currentRole);
 
   if (btn) { btn.disabled = false; btn.innerHTML = 'Se connecter →'; }
 
@@ -300,9 +300,10 @@ function setupAdminDashboard(user) {
   updateAdminNotifBadge();
 }
 
-function renderAdminAccueil(user) {
-  const demandes = Demandes.getAll().filter(d => d.statut === 'en_attente').length;
-  const comptes = Object.keys(Auth.getAll()).length;
+async function renderAdminAccueil(user) {
+  const toutes = await Demandes.getAll();
+  const demandes = toutes.filter(d => d.statut === 'en_attente').length;
+  const comptes = Auth.getAll().length;
   const absAuj = ABSENCES_PROFS.filter(a => a.actif).length;
   const retards = RETARDS_PROFS.filter(r => r.statut === 'en_cours').length;
   const msgs = (ADMIN_MESSAGES_DATA[user.id] || []).filter(m => !m.lu && !m.corbeille).length;
@@ -321,7 +322,7 @@ function renderAdminAccueil(user) {
 
   const demandesEl = $('admin-demandes-recent');
   if (demandesEl) {
-    const recentes = Demandes.getAll().slice(0, 3);
+    const recentes = toutes.slice(0, 3);
     demandesEl.innerHTML = recentes.length ? recentes.map(d => `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F1F5F9">
         <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#1E3A8A,#3B82F6);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0">${(d.prenom[0] + d.nom[0]).toUpperCase()}</div>
@@ -378,7 +379,7 @@ function renderComptes() {
   const roleLabels = { eleve: 'Élève', professeur: 'Professeur', principal: 'Principal', cpe: 'CPE', secretaire: 'Secrétaire' };
   const roleIcons = { eleve: '🎒', professeur: '📚', principal: '🏫', cpe: '🛡️', secretaire: '📋' };
   const dirRoles = ['principal', 'cpe', 'secretaire'];
-  const all = Object.values(tous);
+  const all = tous;
 
   // Badges onglets
   [['tous', all], ['eleve', all.filter(u => u.role === 'eleve')], ['professeur', all.filter(u => u.role === 'professeur')], ['direction', all.filter(u => dirRoles.includes(u.role))]].forEach(([key, arr]) => {
@@ -888,8 +889,8 @@ function filterDemandes(filtre, el) {
   renderDemandes(filtre);
 }
 
-function renderDemandes(filtre) {
-  const toutes = Demandes.getAll();
+async function renderDemandes(filtre) {
+  const toutes = await Demandes.getAll();
   const nb = toutes.filter(d => d.statut === 'en_attente').length;
 
   // Stats
@@ -956,8 +957,8 @@ function renderDemandes(filtre) {
   }).join('');
 }
 
-function approveDemande(id) {
-  const result = Demandes.approuver(id);
+async function approveDemande(id) {
+  const result = await Demandes.approuver(id);
   if (result.ok) {
     showToast(`✅ ${result.msg}`);
     renderDemandes(currentDemandeFilter);
@@ -967,9 +968,9 @@ function approveDemande(id) {
   }
 }
 
-function refuserDemande(id) {
+async function refuserDemande(id) {
   if (!confirm('Refuser cette demande de compte ?')) return;
-  const result = Demandes.refuser(id, 'Refusé par la direction');
+  const result = await Demandes.refuser(id, 'Refusé par la direction');
   if (result.ok) {
     showToast('🚫 Demande refusée.');
     renderDemandes(currentDemandeFilter);
@@ -1379,7 +1380,7 @@ function parseDate(str) {
 function getChapitreEleveForMatiere(classe, matiere) {
   // Chercher le prof qui enseigne cette matière à cette classe
   const tous = Auth.getAll();
-  const profEntry = Object.values(tous).find(u =>
+  const profEntry = tous.find(u =>
     u.role === 'professeur' &&
     u.matiere === matiere &&
     (u.classes || []).includes(classe)
@@ -2197,7 +2198,7 @@ function renderEleveProgression(user) {
 
     // Tous les chapitres de cette matière pour la mini-timeline
     const tous = Auth.getAll();
-    const profEntry = Object.values(tous).find(u =>
+    const profEntry = tous.find(u =>
       u.role === 'professeur' && u.matiere === matiere && (u.classes || []).includes(classe)
     );
     let tousChaps = [];
@@ -4505,8 +4506,9 @@ function setupParentDashboard(user) {
   $('parent-welcome').textContent = `Bonjour, ${user.prenom} 👋`;
 
   // Récupérer les enfants
+  const allUsers = Auth.getAll();
   const enfants = (user.enfants || [])
-    .map(id => Auth.getAll()[id])
+    .map(id => allUsers.find(u => u.id === id))
     .filter(Boolean);
 
   if (!enfants.length) {
@@ -4554,12 +4556,12 @@ function renderEnfantsBtns(enfants, activeId) {
 }
 
 function selectParentEnfant(id) {
-  const enfant = Auth.getAll()[id];
+  const enfant = Auth.getAll().find(u => u.id === id);
   if (!enfant) return;
   parentEnfantActif = enfant;
   parentWeekOffset = 0;
   // Re-render les boutons avec le nouvel actif
-  const enfants = (currentUser.enfants || []).map(eid => Auth.getAll()[eid]).filter(Boolean);
+  const enfants = (currentUser.enfants || []).map(eid => Auth.getAll().find(u => u.id === eid)).filter(Boolean);
   renderEnfantsBtns(enfants, id);
   renderParentAccueil();
   // Re-render la section active
@@ -5006,7 +5008,7 @@ function renderParentProgression(e) {
     const col = getMatiereColor(matiere);
     const ch = getChapitreEleveForMatiere(classe, matiere);
     const tous = Auth.getAll();
-    const profEntry = Object.values(tous).find(u => u.role === 'professeur' && u.matiere === matiere && (u.classes || []).includes(classe));
+    const profEntry = tous.find(u => u.role === 'professeur' && u.matiere === matiere && (u.classes || []).includes(classe));
     let tousChaps = profEntry ? ([...(CHAPITRES_PROG[profEntry.id]?.[classe] || [])].sort((a, b) => a.num - b.num)) : [];
     if (profEntry && !tousChaps.length) {
       if (!CHAPITRES_PROG[profEntry.id]) CHAPITRES_PROG[profEntry.id] = {};
@@ -5238,7 +5240,7 @@ function renderCpePlanningProf() {
    STATISTIQUES DIRECTION — TABLEAU DE BORD ANALYTIQUE
    ══════════════════════════════════════════════════════════════ */
 
-function renderStatsDirection() {
+async function renderStatsDirection() {
   const cont = $('stats-direction-container');
   if (!cont) return;
 
@@ -5285,7 +5287,7 @@ function renderStatsDirection() {
   const absProfsActives = (typeof ABSENCES_PROFS !== 'undefined') ? ABSENCES_PROFS.filter(a => a.actif).length : 0;
 
   /* Demandes en attente */
-  const demandesAttente = (typeof Demandes !== 'undefined') ? Demandes.getAll().filter(d => d.statut === 'en_attente').length : 0;
+  const demandesAttente = (typeof Demandes !== 'undefined') ? (await Demandes.getAll()).filter(d => d.statut === 'en_attente').length : 0;
 
   cont.innerHTML = `
 
