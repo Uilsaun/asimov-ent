@@ -1,0 +1,32 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "desktop", "desktop", "{7A1224A0-F22D-34FF-DE0A-A058FAFFD90C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AsimovENT-Desktop", "AsimovENT-Desktop", "{FB58CA41-7C58-E7E1-B6D5-CF20C301651A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AsimovENT", "desktop\AsimovENT-Desktop\AsimovENT.csproj", "{A0E0F402-0355-47CF-9356-0944B63F99E7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A0E0F402-0355-47CF-9356-0944B63F99E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A0E0F402-0355-47CF-9356-0944B63F99E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A0E0F402-0355-47CF-9356-0944B63F99E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A0E0F402-0355-47CF-9356-0944B63F99E7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FB58CA41-7C58-E7E1-B6D5-CF20C301651A} = {7A1224A0-F22D-34FF-DE0A-A058FAFFD90C}
+		{A0E0F402-0355-47CF-9356-0944B63F99E7} = {FB58CA41-7C58-E7E1-B6D5-CF20C301651A}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {61CF2156-8528-4718-8609-B5E5EA6D4EFE}
+	EndGlobalSection
+EndGlobal
