@@ -2,6 +2,8 @@
 
 This project contains the ENT platform developed for Asimov College, designed to provide a dedicated and exclusive digital environment. Access is restricted to users registered by the college administration. The interface replicates a modern and well-known ENT to ensure a familiar and intuitive experience.
 
+This project is used in the BTS SIO program at Louise Michel Grenoble as part of the E6 exams.
+
 > 🎓 BTS SIO project — Lycée Louise Michel, Grenoble
 
 ---
@@ -92,11 +94,11 @@ College-asimov-V2/
    PORT=3000
    ```
 
-5. Start the build.
-From the Desktop folder, run the build.ps1 script
-
-cd .\Desktop\
-.\build.ps1
+5. Start command 
+   ```
+   cd .\api\
+   npm run desktop
+   ```
 ---
 
 ## Demo Accounts
