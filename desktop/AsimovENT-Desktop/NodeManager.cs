@@ -32,8 +32,26 @@ namespace AsimovENT
             if (_running) return true;
 
             // Chemin vers api/server.js (relatif à l'exe)
-            string exeDir = AppContext.BaseDirectory;
-            string apiDir = @"D:\Coll-ge Asi\coll-ge-asimov\asimov-ent\asimov\test\CollegeAsimovV2\asimov-ent\api";
+            // Remonte dans les dossiers parents jusqu'à trouver le dossier "api"
+            string? current = AppContext.BaseDirectory;
+            string? apiDir = null;
+
+            while (current != null)
+            {
+                string candidate = Path.Combine(current, "api");
+                if (Directory.Exists(candidate) && File.Exists(Path.Combine(candidate, "server.js")))
+                {
+                    apiDir = candidate;
+                    break;
+                }
+                current = Directory.GetParent(current)?.FullName;
+            }
+
+            if (apiDir == null)
+            {
+                MessageBox.Show("Impossible de trouver le dossier api/...");
+                return false;
+            }
             string serverJs = Path.Combine(apiDir, "server.js");
 
             if (!File.Exists(serverJs))
@@ -63,7 +81,7 @@ namespace AsimovENT
                 _nodeProcess = new Process { StartInfo = startInfo };
 
                 // Log stdout/stderr dans un fichier pour debug
-                string logPath = Path.Combine(exeDir, "asimov-api.log");
+                string logPath = Path.Combine(apiDir, "asimov-api.log");
                 _nodeProcess.OutputDataReceived += (s, e) => AppendLog(logPath, e.Data);
                 _nodeProcess.ErrorDataReceived += (s, e) => AppendLog(logPath, e.Data);
 
