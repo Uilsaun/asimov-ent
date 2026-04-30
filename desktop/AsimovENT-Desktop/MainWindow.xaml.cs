@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Animation;
+using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
 
 namespace AsimovENT
@@ -19,6 +20,18 @@ namespace AsimovENT
         public MainWindow()
         {
             InitializeComponent();
+
+            // Icône : aucune
+            this.Icon = null;
+
+            // Titlebar bleu foncé (Windows 11)
+            SourceInitialized += (s, e) =>
+            {
+                var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+                int color = 0x004A1E0C; // BGR de #0C1E4A
+                DwmSetWindowAttribute(hwnd, 35, ref color, sizeof(int));
+            };
+
             Loaded += OnLoaded;
             Closing += OnClosing;
         }
@@ -154,5 +167,8 @@ namespace AsimovENT
         {
             NodeManager.Instance.Stop();
         }
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
     }
 }
