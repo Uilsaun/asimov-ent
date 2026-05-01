@@ -217,22 +217,61 @@ INSERT IGNORE INTO statuts (libelle) VALUES ('actif'),('inactif');
 INSERT IGNORE INTO regimes (libelle) VALUES ('externe'),('demi-pensionnaire'),('interne');
 
 -- ═══════════════════════════════════════════════════════════
--- UTILISATEURS (password = placeholder, hashé par hash-passwords.js)
+-- UTILISATEURS
+-- Étape 1 : INSERT IGNORE avec 'placeholder' → n'insère que si
+--           l'utilisateur n'existe pas encore
+-- Étape 2 : UPDATE ... WHERE password_hash = 'placeholder' →
+--           applique le vrai hash seulement si pas encore défini
+--           (un vrai mot de passe personnalisé ne sera jamais écrasé)
 -- ═══════════════════════════════════════════════════════════
 
 INSERT IGNORE INTO users (id, password_hash, role_id, prenom, nom, avatar, email, statut_id, matiere_id, poste) VALUES
-  ('prof1',       'placeholder', 2, 'Pierre',   'Dupont',  'PD', 'p.dupont@asimov.edu',    1, 1, NULL),
-  ('prof2',       'placeholder', 2, 'Marie',    'Laurent', 'ML', 'm.laurent@asimov.edu',   1, 2, NULL),
-  ('principal1',  'placeholder', 3, 'Isabelle', 'Benoît',  'IB', 'direction@asimov.edu',   1, NULL, 'Chef d''établissement'),
-  ('cpe1',        'placeholder', 4, 'Romain',   'Vidal',   'RV', 'cpe@asimov.edu',         1, NULL, 'Conseiller Principal d''Éducation'),
-  ('secretaire1', 'placeholder', 5, 'Nathalie', 'Morin',   'NM', 'secretariat@asimov.edu', 1, NULL, 'Secrétaire de direction'),
+  ('prof1',       'placeholder', 2, 'Pierre',   'Dupont',  'PD', 'p.dupont@asimov.edu',     1, 1,    NULL),
+  ('prof2',       'placeholder', 2, 'Marie',    'Laurent', 'ML', 'm.laurent@asimov.edu',    1, 2,    NULL),
+  ('principal1',  'placeholder', 3, 'Isabelle', 'Benoît',  'IB', 'direction@asimov.edu',    1, NULL, 'Chef d''établissement'),
+  ('cpe1',        'placeholder', 4, 'Romain',   'Vidal',   'RV', 'cpe@asimov.edu',          1, NULL, 'Conseiller Principal d''Éducation'),
+  ('secretaire1', 'placeholder', 5, 'Nathalie', 'Morin',   'NM', 'secretariat@asimov.edu',  1, NULL, 'Secrétaire de direction'),
   ('parent1',     'placeholder', 6, 'Sophie',   'Lefebvre','SL', 'lefebvre.parents@mail.fr',1, NULL, NULL),
-  ('parent2',     'placeholder', 6, 'Karim',    'Benali',  'KB', 'benali.parents@mail.fr', 1, NULL, NULL);
+  ('parent2',     'placeholder', 6, 'Karim',    'Benali',  'KB', 'benali.parents@mail.fr',  1, NULL, NULL);
 
 INSERT IGNORE INTO users (id, password_hash, role_id, prenom, nom, avatar, email, statut_id, classe_id, date_naissance, regime_id) VALUES
   ('lefebvre.martin.12032011', 'placeholder', 1, 'Martin', 'Lefebvre', 'ML', 'lefebvre.martin.12032011@asimov.edu', 1, 10, '12/03/2011', 2),
   ('benali.sofia.07092010',    'placeholder', 1, 'Sofia',  'Benali',   'SB', 'benali.sofia.07092010@asimov.edu',    1, 13, '07/09/2010', 1),
   ('lefebvre.emma.05112013',   'placeholder', 1, 'Emma',   'Lefebvre', 'EL', 'lefebvre.emma.05112013@asimov.edu',   1,  1, '05/11/2013', 2);
+
+-- ─── Initialisation des mots de passe (mot de passe = identifiant) ─────
+-- N'écrase pas un mot de passe déjà personnalisé
+
+UPDATE users SET password_hash = '$2b$10$QqgWNEiAEQ3FEf7If83PdeFEbjkxQaVgkMj2eiFABPzFxO2H0SbCS' WHERE id = 'prof1'                    AND password_hash = 'placeholder';
+UPDATE users SET password_hash = '$2b$10$415LxWGQ7sJqJcsyrSGB8O2ijQKdCAGqtXYmg45ZHCI6I.G.bXVvS' WHERE id = 'prof2'                    AND password_hash = 'placeholder';
+UPDATE users SET password_hash = '$2b$10$pHpdHfeyIm3r7ZSlm4G9Ve9wTVdBX1ant41YOIiXKlfmQ7g3nGSfy' WHERE id = 'principal1'               AND password_hash = 'placeholder';
+UPDATE users SET password_hash = '$2b$10$F1NgeAr2dln.sAGvmb984OaoNBVdUaA180VYCkl7iMEAd92u/TAuK' WHERE id = 'cpe1'                     AND password_hash = 'placeholder';
+UPDATE users SET password_hash = '$2b$10$.wc7lL.Hn7.dT4cWVoIDiuYAdJVWEuwtvYYiQmbMWL8RJXb1.w91K' WHERE id = 'secretaire1'              AND password_hash = 'placeholder';
+UPDATE users SET password_hash = '$2b$10$c1e5zWVs9n/nLdZQvGqN1uNk1hzRLxU/.T6dI/2iNlmKZ13suGvrq' WHERE id = 'parent1'                  AND password_hash = 'placeholder';
+UPDATE users SET password_hash = '$2b$10$/ZKdZCLzI5MfyOdlzNDCvOYWd2gEpBCBfsItHsVVE/0tTTVEUYfgK' WHERE id = 'parent2'                  AND password_hash = 'placeholder';
+UPDATE users SET password_hash = '$2b$10$Ettr2I4Ul5aCYEzoFjbsvO8FxFgoDR5qS3Xsg6WToOwaHZQtLRDaC' WHERE id = 'lefebvre.martin.12032011' AND password_hash = 'placeholder';
+UPDATE users SET password_hash = '$2b$10$wh0I8BOkO0hhIk40drseo.l3lOCe9o9lV0NLHVjpCIQVVyrxnUFmy' WHERE id = 'benali.sofia.07092010'    AND password_hash = 'placeholder';
+UPDATE users SET password_hash = '$2b$10$Ucpd3c.xPzPM01V7yr34veVMqP4ng0wLChaelPXJRW1z/BPbUYqiS' WHERE id = 'lefebvre.emma.05112013'   AND password_hash = 'placeholder';
+
+-- ═══════════════════════════════════════════════════════════
+-- IDENTIFIANTS ET MOTS DE PASSE PAR DÉFAUT
+-- (mot de passe = identifiant)
+-- ───────────────────────────────────────────────────────────
+-- | Identifiant               | Mot de passe              | Rôle        |
+-- | prof1                     | prof1                     | Professeur  |
+-- | prof2                     | prof2                     | Professeur  |
+-- | principal1                | principal1                | Direction   |
+-- | cpe1                      | cpe1                      | Direction   |
+-- | secretaire1               | secretaire1               | Direction   |
+-- | parent1                   | parent1                   | Parent      |
+-- | parent2                   | parent2                   | Parent      |
+-- | lefebvre.martin.12032011  | lefebvre.martin.12032011  | Élève       |
+-- | benali.sofia.07092010     | benali.sofia.07092010     | Élève       |
+-- | lefebvre.emma.05112013    | lefebvre.emma.05112013    | Élève       |
+-- ═══════════════════════════════════════════════════════════
+
+
+-- ─── RELATIONS ─────────────────────────────────────────────
 
 INSERT IGNORE INTO parent_eleves (parent_id, eleve_id) VALUES
   ('parent1', 'lefebvre.martin.12032011'),
@@ -249,8 +288,8 @@ INSERT IGNORE INTO eleves_preinscrits (cle, prenom, nom, classe_id, date_naissan
   ('lefebvre.emma.05112013',   'Emma',   'Lefebvre',  1, '05/11/2013');
 
 INSERT IGNORE INTO menus_cantine (jour, entree, plat, dessert, veggie) VALUES
-  ('Lundi',    'Salade niçoise',       'Poulet rôti & haricots verts', 'Yaourt nature',      'Gratin de légumes'),
-  ('Mardi',    'Soupe de légumes',     'Saumon & riz pilaf',           'Compote de pommes',  'Quiche aux poireaux'),
-  ('Mercredi', 'Crudités variées',     'Steak haché & pâtes',          'Fruit de saison',    'Omelette aux champignons'),
-  ('Jeudi',    'Taboulé maison',       'Rôti de porc & pommes dauphine','Crème caramel',     'Lasagnes végétales'),
-  ('Vendredi', 'Velouté de potimarron','Poisson pané & frites',         'Mousse au chocolat','Pizza margherita');
+  ('Lundi',    'Salade niçoise',        'Poulet rôti & haricots verts',  'Yaourt nature',      'Gratin de légumes'),
+  ('Mardi',    'Soupe de légumes',      'Saumon & riz pilaf',            'Compote de pommes',  'Quiche aux poireaux'),
+  ('Mercredi', 'Crudités variées',      'Steak haché & pâtes',           'Fruit de saison',    'Omelette aux champignons'),
+  ('Jeudi',    'Taboulé maison',        'Rôti de porc & pommes dauphine','Crème caramel',      'Lasagnes végétales'),
+  ('Vendredi', 'Velouté de potimarron', 'Poisson pané & frites',         'Mousse au chocolat', 'Pizza margherita');
